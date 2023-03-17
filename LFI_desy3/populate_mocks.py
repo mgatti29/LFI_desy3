@@ -118,7 +118,7 @@ srun --nodes=4 --tasks-per-node=32 --cpus-per-task=2 --cpu-bind=cores  python po
 
 
 
-srun --nodes=4 --tasks-per-node=10 --cpus-per-task=6 --cpu-bind=cores  python populate_mocks.py
+srun --nodes=4 --tasks-per-node=10 --cpus-per-task=6 --cpu-bind=cores  python populate_mocks_corr.py
 
 srun --nodes=4 --tasks-per-node=1 --cpus-per-task=64 --cpu-bind=cores  python populate_mocks.py
 
@@ -462,27 +462,15 @@ def make_maps(uuu):
                     except:
                         pass
                 
-                if rot ==0:
-                    g1_tomo[tomo_bin] = hp.ud_grade( copy.copy(g1_tomo[tomo_bin]),nside_out=config['nside2'])
-                    g2_tomo[tomo_bin] = hp.ud_grade( copy.copy(g2_tomo[tomo_bin]),nside_out=config['nside2'])
-                    d_tomo[tomo_bin] =  hp.ud_grade( copy.copy(d_tomo[tomo_bin]),nside_out=config['nside2'])
-                elif rot ==1:
+                #if rot ==0:
+                g1_tomo[tomo_bin] = hp.ud_grade( copy.copy(g1_tomo[tomo_bin]),nside_out=config['nside2'])
+                g2_tomo[tomo_bin] = hp.ud_grade( copy.copy(g2_tomo[tomo_bin]),nside_out=config['nside2'])
+                d_tomo[tomo_bin] =  hp.ud_grade( copy.copy(d_tomo[tomo_bin]),nside_out=config['nside2'])
+                
+                
+               
 
-                    g1_tomo[tomo_bin] = rotate_map_approx(hp.ud_grade(g1_tomo[tomo_bin],nside_out=config['nside2']),[ 180 ,0 , 0], flip=False,nside = config['nside2'])
-                    g2_tomo[tomo_bin] = rotate_map_approx(hp.ud_grade(g2_tomo[tomo_bin],nside_out=config['nside2']),[ 180 ,0 , 0], flip=False,nside = config['nside2'])
-                    d_tomo[tomo_bin] =  rotate_map_approx(hp.ud_grade(d_tomo[tomo_bin] ,nside_out=config['nside2']),[ 180 ,0 , 0], flip=False ,nside = config['nside2'])
-                elif rot ==2:
 
-                    g1_tomo[tomo_bin] = rotate_map_approx(hp.ud_grade(g1_tomo[tomo_bin],nside_out=config['nside2']),[ 90 ,0 , 0], flip=True,nside = config['nside2'] )
-                    g2_tomo[tomo_bin] = rotate_map_approx(hp.ud_grade(g2_tomo[tomo_bin],nside_out=config['nside2']),[ 90 ,0 , 0], flip=True,nside = config['nside2'] )
-                    d_tomo[tomo_bin] =  rotate_map_approx(hp.ud_grade(d_tomo[tomo_bin] ,nside_out=config['nside2']),[ 90 ,0 , 0], flip=True ,nside = config['nside2'] )
-                elif rot ==3:
-
-                    g1_tomo[tomo_bin] = rotate_map_approx(hp.ud_grade(g1_tomo[tomo_bin],nside_out=config['nside2']),[ 270 ,0 , 0], flip=True,nside = config['nside2'] )
-                    g2_tomo[tomo_bin] = rotate_map_approx(hp.ud_grade(g2_tomo[tomo_bin],nside_out=config['nside2']),[ 270 ,0 , 0], flip=True,nside = config['nside2'] )
-                    d_tomo[tomo_bin] =  rotate_map_approx(hp.ud_grade(d_tomo[tomo_bin] ,nside_out=config['nside2']),[ 270 ,0 , 0], flip=True ,nside = config['nside2'] )
-
-                    
             print ('done loading')      
                     
 
@@ -509,12 +497,50 @@ def make_maps(uuu):
             for tomo_bin in config['sources_bins']:
 
                 sources_cat[rot][tomo_bin] = dict()
-
-                
                 mcal_catalog = load_obj('/global/cfs/cdirs/des/mass_maps/Maps_final/data_catalogs_weighted_{0}'.format(tomo_bin-1))
-
-
                 pix_ = convert_to_pix_coord(mcal_catalog['ra'], mcal_catalog['dec'], nside=config['nside2'])
+                
+                dp_ = copy.deepcopy(depth_weigth[tomo_bin-1])
+                if rot ==1:
+                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 180 ,0 , 0], flip=False,nside = config['nside2'] )
+                    rot_angles = [180, 0, 0]
+                    flip=False
+                    rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                    alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
+                    rot_alpha, rot_delta = rotu(alpha, delta)
+                    if not flip:
+                        rot_i = hp.ang2pix(512, rot_alpha, rot_delta)
+                    else:
+                        rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
+                    pix_ = rot_i[pix_]
+                if rot ==2:
+                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 90 ,0 , 0], flip=True,nside = config['nside2'] )
+                     
+                    rot_angles = [90, 0, 0]
+                    flip=True
+                    rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                    alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
+                    rot_alpha, rot_delta = rotu(alpha, delta)
+                    if not flip:
+                        rot_i = hp.ang2pix(512, rot_alpha, rot_delta)
+                    else:
+                        rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
+                    pix_ = rot_i[pix_]
+                if rot ==3:
+                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 270 ,0 , 0], flip=True,nside = config['nside2'] )
+                    
+                    rot_angles = [270, 0, 0]
+                    flip=True
+                    rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                    alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
+                    rot_alpha, rot_delta = rotu(alpha, delta)
+                    if not flip:
+                        rot_i = hp.ang2pix(512, rot_alpha, rot_delta)
+                    else:
+                        rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
+                    pix_ = rot_i[pix_]     
+                
+                
                 mask = np.in1d(np.arange(hp.nside2npix(config['nside2'])),pix_)
 
 
@@ -524,7 +550,7 @@ def make_maps(uuu):
                 
                 #print (len(df2))
                 # poisson sample the weight map ------
-                nn = np.random.poisson(depth_weigth[tomo_bin-1])
+                nn = np.random.poisson(dp_)
 
                 nn[~mask]= 0
 
@@ -602,8 +628,6 @@ def make_maps(uuu):
                 unique_pix, idx, idx_rep = np.unique(pix, return_index=True, return_inverse=True)
 
 
-
-
                 e1r_map[unique_pix] += np.bincount(idx_rep, weights=es1*w)
                 e2r_map[unique_pix] += np.bincount(idx_rep, weights=es2*w)
 
@@ -627,14 +651,6 @@ def make_maps(uuu):
                 e2r_map0[mask_sims] =  e2r_map0[mask_sims]/(n_map_sc[mask_sims])
                 g1_map[mask_sims]  = g1_map[mask_sims]/(n_map_sc[mask_sims])
                 g2_map[mask_sims] =  g2_map[mask_sims]/(n_map_sc[mask_sims])
-
-
-
-
-                #EE,BB,_   =  g2k_sphere((g1_map+e1r_map0)*nuis['m'][tomo_bin-1], (g2_map+e2r_map0)*nuis['m'][tomo_bin-1], mask_sims, nside=config['nside2'], lmax=config['nside2']*2 ,nosh=True)
-               # EEn,BBn,_ =  g2k_sphere(e1r_map*nuis['m'][tomo_bin-1], e2r_map*nuis['m'][tomo_bin-1], mask_sims, nside=config['nside2'], lmax=config['nside2']*2 ,nosh=True)
-                #sources_cat[rot][tomo_bin] = {'kE':EE,'kE_noise':EEn,'mask':mask_sims}
-                
                 
                 e1_ = ((g1_map+e1r_map0)*nuis['m'][tomo_bin-1])[mask_sims]
                 e2_ = ((g2_map+e2r_map0)*nuis['m'][tomo_bin-1])[mask_sims]
@@ -643,10 +659,7 @@ def make_maps(uuu):
                 idx_ = np.arange(len(mask_sims))[mask_sims]
                 
                 sources_cat[rot][tomo_bin] = {'e1':e1_,'e2':e2_,'e1n':e1n_,'e2n':e2n_,'pix':idx_}
-
-                #sources_cat[tomo_bin]['k_orig'] = EE_orig
-               # del mcal_catalog[tomo_bin-1]
-                
+   
             nuis['hyperrank_rel'] = random_rel
             nuis['A_IA'] = config['A_IA'] 
             nuis['E_IA'] = config['eta_IA'] 
@@ -683,7 +696,7 @@ if __name__ == '__main__':
     runstodo=[]
     for folder_ in folders:
         config = dict()
-        config['noise_rel'] = 14
+        config['noise_rel'] = 30
         config['2PT_FILE'] = '//global/cfs/cdirs//des/www/y3_chains/data_vectors/2pt_NG_final_2ptunblind_02_26_21_wnz_maglim_covupdate_6000HR.fits'
         config['nside_intermediate'] = 512
         config['nside'] = 512
@@ -740,8 +753,8 @@ if __name__ == '__main__':
                 runstodo.append([seed,folder_])
     run_count=0
     print (len(runstodo))
-        
-        
+    #make_maps(runstodo[0]) 
+      
     from mpi4py import MPI 
 ### 
     while run_count<len(runstodo):
@@ -757,18 +770,4 @@ if __name__ == '__main__':
         comm.bcast(run_count,root = 0)
         comm.Barrier() 
        
-#   from mpi4py import MPI 
- 
-  #while run_count<len(runstodo):
-#
-  #    #print("Hello! I'm rank %d from %d running in total..." % (comm.rank, comm.size))
-  #    if (run_count)<len(runstodo):
-  #        #try:
-  #        make_maps(runstodo[run_count])
-  #        #except:
-  #        #    print ('failed ',runstodo[run_count+comm.rank])
-  #        #    pass
-  #    run_count+=1 #comm.size
-  #   # comm.bcast(run_count,root = 0)
-  #    #comm.Barrier() 
-  ##
+    
