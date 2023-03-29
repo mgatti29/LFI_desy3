@@ -540,8 +540,10 @@ def make_maps(uuu):
                 
                 dp_ = copy.deepcopy(depth_weigth[tomo_bin-1])
                 if rot ==0:
-                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 0 ,0 , 0], flip=False,nside = config['nside2'] )
                     rot_angles = [0, 0, 0]
+                    flip = False
+                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],rot_angles, flip=flip,nside = config['nside2'] )
+                    
                     flip=False
                     rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
                     alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
@@ -553,9 +555,11 @@ def make_maps(uuu):
                     pix_ = rot_i[pix_]
                     
                 if rot ==1:
-                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 180 ,0 , 0], flip=False,nside = config['nside2'] )
                     rot_angles = [180, 0, 0]
                     flip=False
+                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],rot_angles, flip=flip,nside = config['nside2'] )
+                    
+                    
                     rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
                     alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
                     rot_alpha, rot_delta = rotu(alpha, delta)
@@ -565,10 +569,11 @@ def make_maps(uuu):
                         rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
                     pix_ = rot_i[pix_]
                 if rot ==2:
-                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 90 ,0 , 0], flip=True,nside = config['nside2'] )
-                     
                     rot_angles = [90, 0, 0]
                     flip=True
+                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],rot_angles, flip=flip,nside = config['nside2'] )
+                     
+
                     rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
                     alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
                     rot_alpha, rot_delta = rotu(alpha, delta)
@@ -578,10 +583,11 @@ def make_maps(uuu):
                         rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
                     pix_ = rot_i[pix_]
                 if rot ==3:
-                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 270 ,0 , 0], flip=True,nside = config['nside2'] )
-                    
                     rot_angles = [270, 0, 0]
                     flip=True
+                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 270 ,0 , 0], flip=flip,nside = config['nside2'] )
+                    
+     
                     rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
                     alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
                     rot_alpha, rot_delta = rotu(alpha, delta)
