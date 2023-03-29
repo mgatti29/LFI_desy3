@@ -114,7 +114,7 @@ def rotate_map_approx(mask, rot_angles, flip=False,nside = 1024):
 This code takes the output of pkdgrav sims. It generates simulated des y3 like catalogs, adding shape noise and weights from the fiducial des y3 catalog on data. 
 
 how to run it in parallel (when you have multiple  sims:
-srun --nodes=4 --tasks-per-node=32 --cpus-per-task=2 --cpu-bind=cores  python populate_mocks.py
+srun --nodes=4 --tasks-per-node=32 python populate_mocks_corr.py
 
 
 
@@ -220,41 +220,58 @@ def make_maps(uuu):
     #  ********************************************************************************************
 
     # let's read raw particle numbers and make lens files:
-    print ('save lenses')
-    for s in frogress.bar(range(len(resume['Step']))):
-        
-        
-        step_ = np.int(np.float(resume['Step'][s]))
-      
-        if step_ <10:
-            zz = copy.copy('0000'+str(step_))
-      
-        elif (step_>=10) & (step_<100):
-  
-            zz =  copy.copy('000'+str(step_))
-        elif (step_>=100):
-                        
-            zz =  copy.copy('00'+str(step_))
+    
+    path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(20,config['nside'])
+    if not os.path.exists(path_):
+        for s in frogress.bar(range(len(resume['Step']))):
 
-        path_ = path_folder_output+'/lens_{0}_{1}.fits'.format(np.int(step_),config['nside_intermediate'])
- 
-        if not os.path.exists(path_):
-        
-            if os.path.exists(path_folder+'/run.'+zz+'.lightcone.npy'.format(zz)):
-                shell_ =np.load(path_folder+'/run.'+zz+'.lightcone.npy'.format(zz),allow_pickle=True)
-                shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
-                shell_ = hp.ud_grade(shell_,nside_out=config['nside_intermediate'])
-                fits_f = Table()
-                fits_f['T'] = shell_
-                if os.path.exists(path_):
-                    os.remove(path_)
-                 
-                fits_f.write(path_)
+
+            step_ = np.int(np.float(resume['Step'][s]))
+
+            if step_ <10:
+                zz = copy.copy('0000'+str(step_))
+
+            elif (step_>=10) & (step_<100):
+
+                zz =  copy.copy('000'+str(step_))
+            elif (step_>=100):
+
+                zz =  copy.copy('00'+str(step_))
+
+            path_ = path_folder_output+'/lens_{0}_{1}.fits'.format(np.int(step_),config['nside_intermediate'])
+
+            if not os.path.exists(path_):
+
+                if os.path.exists(path_folder+'/run.'+zz+'.lightcone.npy'.format(zz)):
+                    shell_ =np.load(path_folder+'/run.'+zz+'.lightcone.npy'.format(zz),allow_pickle=True)
+                    shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
+                    shell_ = hp.ud_grade(shell_,nside_out=config['nside_intermediate'])
+                    fits_f = Table()
+                    fits_f['T'] = shell_
+                    if os.path.exists(path_):
+                        os.remove(path_)
+
+                    fits_f.write(path_)
+                    
+            path_ = path_folder_output+'/lens_{0}_{1}.fits'.format(np.int(step_),config['nside'])
+
+            if not os.path.exists(path_):
+
+                if os.path.exists(path_folder+'/run.'+zz+'.lightcone.npy'.format(zz)):
+                    shell_ =np.load(path_folder+'/run.'+zz+'.lightcone.npy'.format(zz),allow_pickle=True)
+                    shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
+                    shell_ = hp.ud_grade(shell_,nside_out=config['nside'])
+                    fits_f = Table()
+                    fits_f['T'] = shell_
+                    if os.path.exists(path_):
+                        os.remove(path_)
+
+                    fits_f.write(path_)
 
             
     
     # this is at reasonably high redshift...
-    path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(20,config['nside_intermediate'])
+    path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(20,config['nside'])
 
 
 
@@ -268,6 +285,7 @@ def make_maps(uuu):
     z_bin_edges[0] = 1e-6
     from astropy.cosmology import FlatLambdaCDM,wCDM
 
+    
     cosmology = wCDM(H0= h,
                  Om0=om,#mega_fld,
                  Ode0=1-om,#Omega_fld,
@@ -277,7 +295,7 @@ def make_maps(uuu):
     z_centre = np.array([z_at_value(cosmology.comoving_distance, 0.5*(comoving_edges[i]+comoving_edges[i+1]))  for i in range(len(comoving_edges)-1)])
     
     comoving_edges =  [cosmology.comoving_distance(x_) for x_ in np.array((z_bin_edges))]
-
+    
     
 
     
@@ -285,6 +303,11 @@ def make_maps(uuu):
     comoving_edges = np.array([c.value for c in comoving_edges])
     comoving_edges = comoving_edges*un_
 
+    
+    # new from file --------------------------------
+    #comoving_edges = np.hstack([0,resume['cmd_far'][::-1]])*un_
+    
+    
 
     if not os.path.exists(path_):
         
@@ -328,13 +351,22 @@ def make_maps(uuu):
         for i in range(kappa_lensing.shape[0]):
           
                 shell = np.int(resume['Step'][-2])-i
+                path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(shell,config['nside'])
+                if os.path.exists(path_):
+                    os.remove(path_)
+                fits_f = Table()
+                fits_f['T'] = hp.ud_grade(kappa_lensing[i],nside_out = config['nside'])
+                fits_f.write(path_)
+            
+            
                 path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(shell,config['nside_intermediate'])
                 if os.path.exists(path_):
                     os.remove(path_)
                 fits_f = Table()
-                fits_f['T'] = kappa_lensing[i]
+                fits_f['T'] = hp.ud_grade(kappa_lensing[i],nside_out =config['nside_intermediate'])
                 fits_f.write(path_)
-            
+                
+                
         print ('save kappa done')
         
         del overdensity_array
@@ -348,7 +380,7 @@ def make_maps(uuu):
     for i in frogress.bar(range(len(resume['Step']))):
         shell = np.int(resume['Step'][-2])-i
         try:
-            path_gg = path_folder_output+'/gg_{0}_{1}.fits'.format(shell,config['nside_intermediate'])
+            path_gg = path_folder_output+'/gg_{0}_{1}.fits'.format(shell,config['nside'])
             m = pf.open(path_gg)
             m = m[1].data['g1']
             
@@ -363,21 +395,27 @@ def make_maps(uuu):
                 d = pf.open(path_)
                 path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(shell,config['nside_intermediate'])
                 k = pf.open(path_)
-                path_ = path_folder_output+'/gg_{0}_{1}.fits'.format(shell,config['nside_intermediate'])
-          
+
 
                 g1_, g2_ = gk_inv(k[1].data['T']-np.mean(k[1].data['T']),k[1].data['T']*0.,config['nside_intermediate'],config['nside_intermediate']*2)
                 g1_IA, g2_IA = gk_inv(d[1].data['T']-np.mean(d[1].data['T']),k[1].data['T']*0.,config['nside_intermediate'],config['nside_intermediate']*2)
 
+                path_ = path_folder_output+'/gg_{0}_{1}.fits'.format(shell,config['nside'])
+          
                 fits_f = Table()
-                fits_f['g1'] = g1_
-                fits_f['g2'] = g2_
-                fits_f['g1_IA'] = g1_IA
-                fits_f['g2_IA'] = g2_IA
+                fits_f['g1'] = hp.ud_grade( g1_,nside_out =config['nside'])
+                fits_f['g2'] = hp.ud_grade(g2_,nside_out =config['nside'])
+                fits_f['g1_IA'] = hp.ud_grade(g1_IA,nside_out =config['nside'])
+                fits_f['g2_IA'] = hp.ud_grade(g2_IA,nside_out =config['nside'])
                 fits_f.write(path_)
             except:
                 pass
 
+        path_ = path_folder_output+'/lens_{0}_{1}.fits'.format(shell,config['nside_intermediate'])
+        os.system('rm {0}'.format(path_))
+        path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(shell,config['nside_intermediate'])
+        os.system('rm {0}'.format(path_))
+          
     
     # let's make integrated shear maps ***************************************************************************************************
     
@@ -387,7 +425,7 @@ def make_maps(uuu):
 
 
 
-    
+
     
     
     # load redshift distributions  **************
@@ -429,9 +467,9 @@ def make_maps(uuu):
 
             print ('LOADING, {0}'.format(rot))
             for tomo_bin in config['sources_bins']:
-                g1_tomo[tomo_bin] = np.zeros(hp.nside2npix(config['nside_intermediate']))
-                g2_tomo[tomo_bin] = np.zeros(hp.nside2npix(config['nside_intermediate']))
-                d_tomo[tomo_bin] = np.zeros(hp.nside2npix(config['nside_intermediate']))
+                g1_tomo[tomo_bin] = np.zeros(hp.nside2npix(config['nside']))
+                g2_tomo[tomo_bin] = np.zeros(hp.nside2npix(config['nside']))
+                d_tomo[tomo_bin] = np.zeros(hp.nside2npix(config['nside']))
                 redshift_distributions_sources['bins'][tomo_bin][250:] = 0.
                 nz_sample = brk.recentre_nz(np.array(z_bin_edges).astype('float'),  redshift_distributions_sources['z'],  redshift_distributions_sources['bins'][tomo_bin] )
                 nz_kernel_sample_dict[tomo_bin] = nz_sample*(z_bin_edges[1:]-z_bin_edges[:-1])
@@ -441,9 +479,9 @@ def make_maps(uuu):
 
                     try:
                         shell = np.int(resume['Step'][-2])-i
-                        path_ = path_folder_output+'/lens_{0}_{1}.fits'.format(shell,config['nside_intermediate'])
-                        pathk_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(shell,config['nside_intermediate'])
-                        pathgg_ =  path_folder_output+'/gg_{0}_{1}.fits'.format(shell,config['nside_intermediate'])
+                        path_ = path_folder_output+'/lens_{0}_{1}.fits'.format(shell,config['nside'])
+                        pathk_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(shell,config['nside'])
+                        pathgg_ =  path_folder_output+'/gg_{0}_{1}.fits'.format(shell,config['nside'])
 
 
 
@@ -501,6 +539,19 @@ def make_maps(uuu):
                 pix_ = convert_to_pix_coord(mcal_catalog['ra'], mcal_catalog['dec'], nside=config['nside2'])
                 
                 dp_ = copy.deepcopy(depth_weigth[tomo_bin-1])
+                if rot ==0:
+                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 0 ,0 , 0], flip=False,nside = config['nside2'] )
+                    rot_angles = [0, 0, 0]
+                    flip=False
+                    rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                    alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
+                    rot_alpha, rot_delta = rotu(alpha, delta)
+                    if not flip:
+                        rot_i = hp.ang2pix(512, rot_alpha, rot_delta)
+                    else:
+                        rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
+                    pix_ = rot_i[pix_]
+                    
                 if rot ==1:
                     dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 180 ,0 , 0], flip=False,nside = config['nside2'] )
                     rot_angles = [180, 0, 0]
@@ -675,7 +726,7 @@ def make_maps(uuu):
         del sources_cat
         gc.collect()
 
-  
+
     
 
 
@@ -696,9 +747,9 @@ if __name__ == '__main__':
     runstodo=[]
     for folder_ in folders:
         config = dict()
-        config['noise_rel'] = 30
+        config['noise_rel'] = 2
         config['2PT_FILE'] = '//global/cfs/cdirs//des/www/y3_chains/data_vectors/2pt_NG_final_2ptunblind_02_26_21_wnz_maglim_covupdate_6000HR.fits'
-        config['nside_intermediate'] = 512
+        config['nside_intermediate'] = 1024
         config['nside'] = 512
         config['path_mocks'] = '/global/cfs/cdirs/des/dirac_sims/original_files/'
         #/global/cfs/cdirs/des/mgatti/Dirac
@@ -755,6 +806,9 @@ if __name__ == '__main__':
     print (len(runstodo))
     #make_maps(runstodo[0]) 
       
+    
+    #make_maps([30,'M'])
+    
     from mpi4py import MPI 
 ### 
     while run_count<len(runstodo):
@@ -770,4 +824,3 @@ if __name__ == '__main__':
         comm.bcast(run_count,root = 0)
         comm.Barrier() 
        
-    
