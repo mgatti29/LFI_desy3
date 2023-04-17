@@ -114,7 +114,7 @@ def rotate_map_approx(mask, rot_angles, flip=False,nside = 1024):
 This code takes the output of pkdgrav sims. It generates simulated des y3 like catalogs, adding shape noise and weights from the fiducial des y3 catalog on data. 
 
 how to run it in parallel (when you have multiple  sims:
-srun --nodes=4 --tasks-per-node=32 python populate_mocks_corr.py
+srun --nodes=4 --tasks-per-node=64 python populate_mocks_corr.py
 
 
 
@@ -411,10 +411,10 @@ def make_maps(uuu):
             except:
                 pass
 
-        path_ = path_folder_output+'/lens_{0}_{1}.fits'.format(shell,config['nside_intermediate'])
-        os.system('rm {0}'.format(path_))
-        path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(shell,config['nside_intermediate'])
-        os.system('rm {0}'.format(path_))
+            path_ = path_folder_output+'/lens_{0}_{1}.fits'.format(shell,config['nside_intermediate'])
+            os.system('rm {0}'.format(path_))
+            path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(shell,config['nside_intermediate'])
+            os.system('rm {0}'.format(path_))
           
     
     # let's make integrated shear maps ***************************************************************************************************
@@ -458,7 +458,10 @@ def make_maps(uuu):
             config['A_IA'] = np.random.randint(-300000,300000,1)[0]/100000
             #config['eta_IA'] = 0.
             config['z0_IA'] = 0.67
-            BIAS_SC = 1.
+            if not SC:
+                BIAS_SC = 0.
+            else:
+                BIAS_SC = 1.
 
             g1_tomo = dict()
             g2_tomo = dict()
@@ -530,20 +533,74 @@ def make_maps(uuu):
 
 
             config['nside2'] = 512 
-            depth_weigth = np.load('/global/cfs/cdirs/des/mass_maps/Maps_final/depth_maps_Y3_{0}_numbdensity.npy'.format(config['nside2']),allow_pickle=True).item()
+            # depth_weigth = np.load('/global/cfs/cdirs/des/mass_maps/Maps_final/depth_maps_Y3_{0}_numbdensity.npy'.format(config['nside2']),allow_pickle=True).item()
 
             for tomo_bin in config['sources_bins']:
 
                 sources_cat[rot][tomo_bin] = dict()
                 mcal_catalog = load_obj('/global/cfs/cdirs/des/mass_maps/Maps_final/data_catalogs_weighted_{0}'.format(tomo_bin-1))
+                
+                pix_ = convert_to_pix_coord(mcal_catalog['ra'], mcal_catalog['dec'], nside=config['nside2'])
+                
+                e1 = mcal_catalog['e1']
+                e2 = mcal_catalog['e2']
+                w  = mcal_catalog['w']
+                
+                if rot ==0:
+                    rot_angles = [0, 0, 0]
+                    flip=False
+                    rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                    alpha, delta = hp.pix2ang(config['nside2'],pix_)
+                    rot_alpha, rot_delta = rotu(alpha, delta)
+                    if not flip:
+                        pix = hp.ang2pix(config['nside2'], rot_alpha, rot_delta)
+                    else:
+                        pix = hp.ang2pix(config['nside2'], np.pi-rot_alpha, rot_delta)
+             
+                if rot ==1:
+                    rot_angles = [180, 0, 0]
+                    flip=False
+                    rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                    alpha, delta = hp.pix2ang(config['nside2'],pix_)
+                    rot_alpha, rot_delta = rotu(alpha, delta)
+                    if not flip:
+                        pix = hp.ang2pix(config['nside2'], rot_alpha, rot_delta)
+                    else:
+                        pix = hp.ang2pix(config['nside2'], np.pi-rot_alpha, rot_delta)
+              
+                if rot ==2:
+                    rot_angles = [90, 0, 0]
+                    flip=True
+                    rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                    alpha, delta = hp.pix2ang(config['nside2'],pix_)
+                    rot_alpha, rot_delta = rotu(alpha, delta)
+                    if not flip:
+                        pix = hp.ang2pix(config['nside2'], rot_alpha, rot_delta)
+                    else:
+                        pix = hp.ang2pix(config['nside2'], np.pi-rot_alpha, rot_delta)
+                
+                if rot ==3:
+                    rot_angles = [270, 0, 0]
+                    flip=True
+                    rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                    alpha, delta = hp.pix2ang(config['nside2'],pix_)
+                    rot_alpha, rot_delta = rotu(alpha, delta)
+                    if not flip:
+                        pix = hp.ang2pix(config['nside2'], rot_alpha, rot_delta)
+                    else:
+                        pix = hp.ang2pix(config['nside2'], np.pi-rot_alpha, rot_delta)
+                      
+
+                del mcal_catalog
+                gc.collect() 
+                
+                '''
                 pix_ = convert_to_pix_coord(mcal_catalog['ra'], mcal_catalog['dec'], nside=config['nside2'])
                 
                 dp_ = copy.deepcopy(depth_weigth[tomo_bin-1])
                 if rot ==0:
+                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 0 ,0 , 0], flip=False,nside = config['nside2'] )
                     rot_angles = [0, 0, 0]
-                    flip = False
-                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],rot_angles, flip=flip,nside = config['nside2'] )
-                    
                     flip=False
                     rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
                     alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
@@ -555,11 +612,9 @@ def make_maps(uuu):
                     pix_ = rot_i[pix_]
                     
                 if rot ==1:
+                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 180 ,0 , 0], flip=False,nside = config['nside2'] )
                     rot_angles = [180, 0, 0]
                     flip=False
-                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],rot_angles, flip=flip,nside = config['nside2'] )
-                    
-                    
                     rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
                     alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
                     rot_alpha, rot_delta = rotu(alpha, delta)
@@ -569,11 +624,10 @@ def make_maps(uuu):
                         rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
                     pix_ = rot_i[pix_]
                 if rot ==2:
+                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 90 ,0 , 0], flip=True,nside = config['nside2'] )
+                     
                     rot_angles = [90, 0, 0]
                     flip=True
-                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],rot_angles, flip=flip,nside = config['nside2'] )
-                     
-
                     rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
                     alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
                     rot_alpha, rot_delta = rotu(alpha, delta)
@@ -583,11 +637,10 @@ def make_maps(uuu):
                         rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
                     pix_ = rot_i[pix_]
                 if rot ==3:
+                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 270 ,0 , 0], flip=True,nside = config['nside2'] )
+                    
                     rot_angles = [270, 0, 0]
                     flip=True
-                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 270 ,0 , 0], flip=flip,nside = config['nside2'] )
-                    
-     
                     rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
                     alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
                     rot_alpha, rot_delta = rotu(alpha, delta)
@@ -644,14 +697,14 @@ def make_maps(uuu):
                 del mcal_catalog
                 gc.collect()
 
+                '''
 
                 f = 1./np.sqrt(d_tomo[tomo_bin]/np.sum(nz_kernel_sample_dict[tomo_bin]))
 
-
-
-             
                 f = f[pix]
 
+                if not SC:
+                    f = 1.
 
                 # ++++++++++++++++++++++
  
@@ -709,10 +762,10 @@ def make_maps(uuu):
                 g1_map[mask_sims]  = g1_map[mask_sims]/(n_map_sc[mask_sims])
                 g2_map[mask_sims] =  g2_map[mask_sims]/(n_map_sc[mask_sims])
                 
-                e1_ = ((g1_map+e1r_map0)*nuis['m'][tomo_bin-1])[mask_sims]
-                e2_ = ((g2_map+e2r_map0)*nuis['m'][tomo_bin-1])[mask_sims]
-                e1n_ = ( e1r_map*nuis['m'][tomo_bin-1])[mask_sims]
-                e2n_ = ( e2r_map*nuis['m'][tomo_bin-1])[mask_sims]
+                e1_ = ((g1_map*nuis['m'][tomo_bin-1]+e1r_map0))[mask_sims]
+                e2_ = ((g2_map*nuis['m'][tomo_bin-1]+e2r_map0))[mask_sims]
+                e1n_ = ( e1r_map)[mask_sims]
+                e2n_ = ( e2r_map)[mask_sims]
                 idx_ = np.arange(len(mask_sims))[mask_sims]
                 
                 sources_cat[rot][tomo_bin] = {'e1':e1_,'e2':e2_,'e1n':e1n_,'e2n':e2n_,'pix':idx_}
@@ -738,7 +791,7 @@ def make_maps(uuu):
 
 
 
-
+SC = True
 
 if __name__ == '__main__':
     
@@ -753,7 +806,7 @@ if __name__ == '__main__':
     runstodo=[]
     for folder_ in folders:
         config = dict()
-        config['noise_rel'] = 2
+        config['noise_rel'] = 102
         config['2PT_FILE'] = '//global/cfs/cdirs//des/www/y3_chains/data_vectors/2pt_NG_final_2ptunblind_02_26_21_wnz_maglim_covupdate_6000HR.fits'
         config['nside_intermediate'] = 1024
         config['nside'] = 512
