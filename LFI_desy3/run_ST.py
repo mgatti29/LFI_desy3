@@ -131,17 +131,14 @@ def compute_phmoments(file,output=''):
                     e1n = np.zeros(hp.nside2npix(conf['nside']))
                     e2n = np.zeros(hp.nside2npix(conf['nside']))
                     e1[dict_temp[rel][t+1]['pix']] = dict_temp[rel][t+1]['e1']
-                    e2[dict_temp[rel][t+1]['pix']] = -dict_temp[rel][t+1]['e2']
+                    e2[dict_temp[rel][t+1]['pix']] = dict_temp[rel][t+1]['e2']
                     e1n[dict_temp[rel][t+1]['pix']] = dict_temp[rel][t+1]['e1n']
-                    e2n[dict_temp[rel][t+1]['pix']] = -dict_temp[rel][t+1]['e2n']
+                    e2n[dict_temp[rel][t+1]['pix']] = dict_temp[rel][t+1]['e2n']
                     
                     mask_sims = np.in1d(np.arange(len(e1)),dict_temp[rel][t+1]['pix'])
-                    if rel>1:
-                        f,fb,almsE , almsB   =  g2k_sphere(-e1,-e2, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
-                        fn,fbn, almsEN , almsBN  =  g2k_sphere(-e1n,-e2n, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
-                    else:
-                        f,fb,almsE , almsB   =  g2k_sphere(e1,e2, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
-                        fn,fbn, almsEN , almsBN  =  g2k_sphere(e1n,e2n, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
+  
+                    f,fb,almsE , almsB   =  g2k_sphere(e1,e2, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
+                    fn,fbn, almsEN , almsBN  =  g2k_sphere(e1n,e2n, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
 
                     almsB_.append(almsB)
                     almsE_.append(almsE)
