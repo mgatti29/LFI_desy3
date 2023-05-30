@@ -533,7 +533,7 @@ def make_maps(uuu):
 
 
             config['nside2'] = 512 
-            # depth_weigth = np.load('/global/cfs/cdirs/des/mass_maps/Maps_final/depth_maps_Y3_{0}_numbdensity.npy'.format(config['nside2']),allow_pickle=True).item()
+            depth_weigth = np.load('/global/cfs/cdirs/des/mass_maps/Maps_final/depth_maps_Y3_{0}_numbdensity.npy'.format(config['nside2']),allow_pickle=True).item()
 
             for tomo_bin in config['sources_bins']:
 
@@ -791,7 +791,7 @@ def make_maps(uuu):
 
 
 
-SC = True
+SC = False
 
 if __name__ == '__main__':
     
