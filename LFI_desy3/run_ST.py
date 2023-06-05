@@ -5,33 +5,59 @@ import numpy as np
 import gc
 import pickle
 import healpy as hp
-def save_obj(name, obj):
-    with open(name + '.pkl', 'wb') as f:
-        pickle.dump(obj, f, protocol=2)
-        f.close()
-
-def load_obj(name):
-    with open(name + '.pkl', 'rb') as f:
-        mute =  pickle.load(f)
-        f.close()
-    return mute
-
 
 import sys
 sys.path.append('/global/u2/m/mgatti/Mass_Mapping/peaks/scattering_transform')
 import scattering
 
-def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048,nosh=True):
-    """
-    Convert shear to convergence on a sphere. In put are all healpix maps.
-    """
 
+def save_obj(name, obj):
+    """
+    Saves an object to a pickle file.
+
+    Args:
+        name (str): The name of the pickle file.
+        obj (object): The object to be saved.
+    """
+    with open(name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, protocol=2)
+        f.close()
+
+def load_obj(name):
+    """
+    Loads an object from a pickle file.
+
+    Args:
+        name (str): The name of the pickle file.
+
+    Returns:
+        object: The loaded object.
+    """
+    with open(name + '.pkl', 'rb') as f:
+        mute = pickle.load(f)
+        f.close()
+    return mute
+
+def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048, nosh=True):
+    """
+    Converts shear to convergence on a sphere using HEALPix maps.
+
+    Args:
+        gamma1 (array): Gamma1 shear map.
+        gamma2 (array): Gamma2 shear map.
+        mask (array): Mask for the maps.
+        nside (int, optional): HEALPix nside parameter. Defaults to 1024.
+        lmax (int, optional): Maximum multipole moment. Defaults to 2048.
+        nosh (bool, optional): Flag indicating whether to remove the monopole and dipole terms. Defaults to True.
+
+    Returns:
+        tuple: E-mode convergence map, B-mode convergence map, and E-mode alms.
+    """
     gamma1_mask = gamma1 * mask
     gamma2_mask = gamma2 * mask
 
     KQU_masked_maps = [gamma1_mask, gamma1_mask, gamma2_mask]
     alms = hp.map2alm(KQU_masked_maps, lmax=lmax, pol=True)  # Spin transform!
-
 
     ell, emm = hp.Alm.getlm(lmax=lmax)
     if nosh:
@@ -39,22 +65,21 @@ def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048,nosh=True):
         almsB = alms[2] * 1. * ((ell * (ell + 1.)) / ((ell + 2.) * (ell - 1))) ** 0.5
     else:
         almsE = alms[1] * 1.
-        almsB = alms[2] * 1. 
+        almsB = alms[2] * 1.
     almsE[ell == 0] = 0.0
     almsB[ell == 0] = 0.0
     almsE[ell == 1] = 0.0
     almsB[ell == 1] = 0.0
 
-
-
     almssm = [alms[0], almsE, almsB]
-
 
     kappa_map_alm = hp.alm2map(almssm[0], nside=nside, lmax=lmax, pol=False)
     E_map = hp.alm2map(almssm[1], nside=nside, lmax=lmax, pol=False)
     B_map = hp.alm2map(almssm[2], nside=nside, lmax=lmax, pol=False)
 
-    return E_map, B_map, almsE, almsB
+    return E_map, B_map, almsE
+
+
 
 def compute_phmoments(file,output=''):
       
