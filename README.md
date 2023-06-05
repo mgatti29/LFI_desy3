@@ -1,4 +1,4 @@
-# LLikelihood-Free Inference for Cosmological Parameter Inference from Weak Lensing Mass Maps 
+# Likelihood-Free Inference for Cosmological Parameter Inference from Weak Lensing Mass Maps 
 
 This repository hosts the necessary code for a comprehensive project that encompasses the generation of mock weak lensing catalogues, mimicking the observed properties of the Dark Energy Survey Year 6 (DES Y6) dataset, and the measurement of various statistics from these catalogues.
 
