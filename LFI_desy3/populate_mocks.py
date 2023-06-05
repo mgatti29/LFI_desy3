@@ -19,57 +19,93 @@ import frogress
 from astropy.table import Table  
 import pandas as pd
 from astropy.cosmology import z_at_value
+import sys
+sys.path.insert(0, "/global/homes/m/mgatti/PKDGRAV/lfi_project/scripts/")
+from utility import *
+
+
+
+
+import pickle
+import numpy as np
+import healpy as hp
+
 def save_obj(name, obj):
+    """
+    Saves an object to a pickle file.
+
+    Args:
+        name (str): The name of the pickle file.
+        obj (object): The object to be saved.
+    """
     with open(name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, protocol=2)
         f.close()
 
 def load_obj(name):
+    """
+    Loads an object from a pickle file.
+
+    Args:
+        name (str): The name of the pickle file.
+
+    Returns:
+        object: The loaded object.
+    """
     with open(name + '.pkl', 'rb') as f:
-        mute =  pickle.load(f)
+        mute = pickle.load(f)
         f.close()
     return mute
-import sys
-sys.path.insert(0, "/global/homes/m/mgatti/PKDGRAV/lfi_project/scripts/")
-from utility import *
 
-def random_draw_ell_from_w(wi,w,e1,e2):
-    '''
-    wi: input weights
-    w,e1,e2: all the weights and galaxy ellipticities of the catalog.
-    e1_,e2_: output ellipticities drawn from w,e1,e2.
-    '''
+def random_draw_ell_from_w(wi, w, e1, e2):
+    """
+    Draws ellipticities from given weights and galaxy ellipticities.
 
+    Args:
+        wi (array): Input weights.
+        w (array): All weights of the catalog.
+        e1 (array): Galaxy ellipticities (component 1).
+        e2 (array): Galaxy ellipticities (component 2).
 
+    Returns:
+        tuple: Randomly drawn ellipticities.
+    """
     ell_cont = dict()
     for w_ in np.unique(w):
         mask_ = w == w_
-        w__ = np.int(w_*10000)
-        ell_cont[w__] = [e1[mask_],e2[mask_]]
+        w__ = np.int(w_ * 10000)
+        ell_cont[w__] = [e1[mask_], e2[mask_]]
 
     e1_ = np.zeros(len(wi))
     e2_ = np.zeros(len(wi))
 
-
     for w_ in np.unique(wi):
-        mask_ = (wi*10000).astype(np.int) == np.int(w_*10000)
-        e1_[mask_] = ell_cont[np.int(w_*10000)][0][np.random.randint(0,len(ell_cont[np.int(w_*10000)][0]),len(e1_[mask_]))]
-        e2_[mask_] = ell_cont[np.int(w_*10000)][1][np.random.randint(0,len(ell_cont[np.int(w_*10000)][0]),len(e1_[mask_]))]
+        mask_ = (wi * 10000).astype(np.int) == np.int(w_ * 10000)
+        e1_[mask_] = ell_cont[np.int(w_ * 10000)][0][np.random.randint(0, len(ell_cont[np.int(w_ * 10000)][0]), len(e1_[mask_]))]
+        e2_[mask_] = ell_cont[np.int(w_ * 10000)][1][np.random.randint(0, len(ell_cont[np.int(w_ * 10000)][0]), len(e1_[mask_]))]
 
-    return e1_,e2_
+    return e1_, e2_
 
-
-def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048,nosh=True):
+def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048, nosh=True):
     """
-    Convert shear to convergence on a sphere. In put are all healpix maps.
-    """
+    Converts shear to convergence on a sphere using HEALPix maps.
 
+    Args:
+        gamma1 (array): Gamma1 shear map.
+        gamma2 (array): Gamma2 shear map.
+        mask (array): Mask for the maps.
+        nside (int, optional): HEALPix nside parameter. Defaults to 1024.
+        lmax (int, optional): Maximum multipole moment. Defaults to 2048.
+        nosh (bool, optional): Flag indicating whether to remove the monopole and dipole terms. Defaults to True.
+
+    Returns:
+        tuple: E-mode convergence map, B-mode convergence map, and E-mode alms.
+    """
     gamma1_mask = gamma1 * mask
     gamma2_mask = gamma2 * mask
 
     KQU_masked_maps = [gamma1_mask, gamma1_mask, gamma2_mask]
     alms = hp.map2alm(KQU_masked_maps, lmax=lmax, pol=True)  # Spin transform!
-
 
     ell, emm = hp.Alm.getlm(lmax=lmax)
     if nosh:
@@ -77,16 +113,13 @@ def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048,nosh=True):
         almsB = alms[2] * 1. * ((ell * (ell + 1.)) / ((ell + 2.) * (ell - 1))) ** 0.5
     else:
         almsE = alms[1] * 1.
-        almsB = alms[2] * 1. 
+        almsB = alms[2] * 1.
     almsE[ell == 0] = 0.0
     almsB[ell == 0] = 0.0
     almsE[ell == 1] = 0.0
     almsB[ell == 1] = 0.0
 
-
-
     almssm = [alms[0], almsE, almsB]
-
 
     kappa_map_alm = hp.alm2map(almssm[0], nside=nside, lmax=lmax, pol=False)
     E_map = hp.alm2map(almssm[1], nside=nside, lmax=lmax, pol=False)
@@ -94,8 +127,19 @@ def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048,nosh=True):
 
     return E_map, B_map, almsE
 
+def rotate_map_approx(mask, rot_angles, flip=False, nside=1024):
+    """
+    Rotates a mask map approximately using rotation angles.
 
-def rotate_map_approx(mask, rot_angles, flip=False,nside = 1024):
+    Args:
+        mask (array): Input mask map.
+        rot_angles (float or array): Rotation angles in degrees.
+        flip (bool, optional): Flag indicating whether to flip the map. Defaults to False.
+        nside (int, optional): HEALPix nside parameter. Defaults to 1024.
+
+    Returns:
+        array: Rotated mask map.
+    """
     alpha, delta = hp.pix2ang(nside, np.arange(len(mask)))
 
     rot = hp.rotator.Rotator(rot=rot_angles, deg=True)
@@ -103,29 +147,14 @@ def rotate_map_approx(mask, rot_angles, flip=False,nside = 1024):
     if not flip:
         rot_i = hp.ang2pix(nside, rot_alpha, rot_delta)
     else:
-        rot_i = hp.ang2pix(nside, np.pi-rot_alpha, rot_delta)
-    rot_map = mask*0.
-    rot_map[rot_i] =  mask[np.arange(len(mask))]
+        rot_i = hp.ang2pix(nside, np.pi - rot_alpha, rot_delta)
+    rot_map = mask * 0.
+    rot_map[rot_i] = mask[np.arange(len(mask))]
+
     return rot_map
 
 
 
-'''
-This code takes the output of pkdgrav sims. It generates simulated des y3 like catalogs, adding shape noise and weights from the fiducial des y3 catalog on data. 
-
-how to run it in parallel (when you have multiple  sims:
-srun --nodes=4 --tasks-per-node=64 python populate_mocks_corr.py
-
-
-
-srun --nodes=4 --tasks-per-node=10 --cpus-per-task=6 --cpu-bind=cores  python populate_mocks_corr.py
-
-srun --nodes=4 --tasks-per-node=1 --cpus-per-task=64 --cpu-bind=cores  python populate_mocks.py
-
-/global/cfs/cdirs/des/dirac_sims/original_files/runsC/run001> run.00100.lightcone.npy
-/pscratch/sd/m/mgatti/Dirac
-
-'''
 
   
 
@@ -134,9 +163,14 @@ srun --nodes=4 --tasks-per-node=1 --cpus-per-task=64 --cpu-bind=cores  python po
 
 
 
-def make_maps(uuu):
- 
-    [seed,folder] = uuu
+def make_maps(info):
+
+    '''
+    This code takes the output of pkdgrav sims, and it generates simulated des y3 like catalogs, adding shape noise and weights from the fiducial des y3 catalog on data. 
+    how to run it in parallel (when you have multiple  sims):
+    srun --nodes=4 --tasks-per-node=64 python populate_mocks_corr.py
+    '''
+    [seed,folder] = info
     # params files:
     #seed = 120
     # label
@@ -163,6 +197,7 @@ def make_maps(uuu):
 
 
   
+    # read cosmological parameters
     f = open(('params_run_1_Niall_{0}.txt'.format(folder)),'r')
     om_ = []
     h_ = []
@@ -203,24 +238,8 @@ def make_maps(uuu):
     run_param_sample = np.genfromtxt('params_run_1_Niall_{0}.txt'.format(folder),delimiter=',')[seed-1]
     w0 = run_param_sample[2]
   
-
-    ###params = np.genfromtxt(path_folder +'transfer_function_cosmology.txt', dtype=None, skip_header=2)
-###
-    ###Omega_c=params[:,2][np.where(params[:,0] == b'Omega_cdm')].astype(float)[0]
-    ###w0 = params[:,2][np.where(params[:,0] == b'w0_fld')].astype(float)[0]
-    ###Omega_b=params[:,2][np.where(params[:,0] == b'Omega_b')].astype(float)[0]
-    ####h=params[:,2][np.where(params[:,0] == b'h')].astype(float)[0]
-    ###A_s=params[:,2][np.where(params[:,0] == b'A_s')].astype(float)[0]
-    ###n_s= params[:,2][np.where(params[:,0] == b'n_s')].astype(float)[0]
-    ###m_nu=0.06
-    ###Omega_k=0.
-    ###Omega_fld = params[:,2][np.where(params[:,0] == b'Omega_fld')].astype(float)[0]
-
-   
-    #  ********************************************************************************************
-
     # let's read raw particle numbers and make lens files:
-    
+  
     path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(20,config['nside'])
     if not os.path.exists(path_):
         for s in frogress.bar(range(len(resume['Step']))):
@@ -272,8 +291,6 @@ def make_maps(uuu):
     
     # this is at reasonably high redshift...
     path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(20,config['nside'])
-
-
 
     kappa_pref_evaluated = brk.kappa_prefactor(h,om, length_unit = 'Mpc')
     
@@ -593,111 +610,7 @@ def make_maps(uuu):
 
                 del mcal_catalog
                 gc.collect() 
-                
-                '''
-                pix_ = convert_to_pix_coord(mcal_catalog['ra'], mcal_catalog['dec'], nside=config['nside2'])
-                
-                dp_ = copy.deepcopy(depth_weigth[tomo_bin-1])
-                if rot ==0:
-                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 0 ,0 , 0], flip=False,nside = config['nside2'] )
-                    rot_angles = [0, 0, 0]
-                    flip=False
-                    rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                    alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
-                    rot_alpha, rot_delta = rotu(alpha, delta)
-                    if not flip:
-                        rot_i = hp.ang2pix(512, rot_alpha, rot_delta)
-                    else:
-                        rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
-                    pix_ = rot_i[pix_]
-                    
-                if rot ==1:
-                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 180 ,0 , 0], flip=False,nside = config['nside2'] )
-                    rot_angles = [180, 0, 0]
-                    flip=False
-                    rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                    alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
-                    rot_alpha, rot_delta = rotu(alpha, delta)
-                    if not flip:
-                        rot_i = hp.ang2pix(512, rot_alpha, rot_delta)
-                    else:
-                        rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
-                    pix_ = rot_i[pix_]
-                if rot ==2:
-                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 90 ,0 , 0], flip=True,nside = config['nside2'] )
-                     
-                    rot_angles = [90, 0, 0]
-                    flip=True
-                    rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                    alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
-                    rot_alpha, rot_delta = rotu(alpha, delta)
-                    if not flip:
-                        rot_i = hp.ang2pix(512, rot_alpha, rot_delta)
-                    else:
-                        rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
-                    pix_ = rot_i[pix_]
-                if rot ==3:
-                    dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 270 ,0 , 0], flip=True,nside = config['nside2'] )
-                    
-                    rot_angles = [270, 0, 0]
-                    flip=True
-                    rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                    alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
-                    rot_alpha, rot_delta = rotu(alpha, delta)
-                    if not flip:
-                        rot_i = hp.ang2pix(512, rot_alpha, rot_delta)
-                    else:
-                        rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
-                    pix_ = rot_i[pix_]     
-                
-                
-                mask = np.in1d(np.arange(hp.nside2npix(config['nside2'])),pix_)
 
-
-                # generate ellipticities ***********************************
-                df2 = pd.DataFrame(data = {'w':mcal_catalog['w'] ,'pix_':pix_},index = pix_)
-                #df2 = df2.groupby(df2.columns.tolist(),as_index=False).size()
-                
-                #print (len(df2))
-                # poisson sample the weight map ------
-                nn = np.random.poisson(dp_)
-
-                nn[~mask]= 0
-
-
-                count = 0
-
-                nnmaxx = max(nn)
-                    
-                for count in range(nnmaxx):
-
-                    if count %2 ==0:
-                        df3 = df2.sample(frac=1)
-                        df4 = df3.drop_duplicates('pix_',keep ='first').sort_index()
-                    else:
-                        df4 = df3.drop_duplicates('pix_',keep ='last').sort_index()
-                        
-                    pix_valid = np.arange(len(nn))[nn>0]
-                    df3 = df4.loc[np.unique(pix_valid)]
-                    if count == 0:
-                        w = df3['w']
-                        pix = df3['pix_']
-                    else:
-                        w = np.hstack([w,df3['w']])
-                        pix = np.hstack([pix,df3['pix_']]) 
-                    nn -= 1
-       
-                del df2
-                del df3
-                gc.collect()
-                e1,e2 = random_draw_ell_from_w(w,mcal_catalog['w'],mcal_catalog['e1'],mcal_catalog['e2'])
-
-
-
-                del mcal_catalog
-                gc.collect()
-
-                '''
 
                 f = 1./np.sqrt(d_tomo[tomo_bin]/np.sum(nz_kernel_sample_dict[tomo_bin]))
 
