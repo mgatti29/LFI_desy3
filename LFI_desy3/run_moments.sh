@@ -10,5 +10,5 @@
 module load python
 source activate py38
 cd /global/u2/m/mgatti/Mass_Mapping/peaks
-srun  python un_old_moments.py 
+srun  python run_old_moments.py 
 
