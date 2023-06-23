@@ -5,59 +5,33 @@ import numpy as np
 import gc
 import pickle
 import healpy as hp
-
-import sys
-sys.path.append('/global/u2/m/mgatti/Mass_Mapping/peaks/scattering_transform')
-import scattering
-
-
 def save_obj(name, obj):
-    """
-    Saves an object to a pickle file.
-
-    Args:
-        name (str): The name of the pickle file.
-        obj (object): The object to be saved.
-    """
     with open(name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, protocol=2)
         f.close()
 
 def load_obj(name):
-    """
-    Loads an object from a pickle file.
-
-    Args:
-        name (str): The name of the pickle file.
-
-    Returns:
-        object: The loaded object.
-    """
     with open(name + '.pkl', 'rb') as f:
-        mute = pickle.load(f)
+        mute =  pickle.load(f)
         f.close()
     return mute
 
-def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048, nosh=True):
-    """
-    Converts shear to convergence on a sphere using HEALPix maps.
 
-    Args:
-        gamma1 (array): Gamma1 shear map.
-        gamma2 (array): Gamma2 shear map.
-        mask (array): Mask for the maps.
-        nside (int, optional): HEALPix nside parameter. Defaults to 1024.
-        lmax (int, optional): Maximum multipole moment. Defaults to 2048.
-        nosh (bool, optional): Flag indicating whether to remove the monopole and dipole terms. Defaults to True.
+import sys
+sys.path.append('/global/u2/m/mgatti/Mass_Mapping/peaks/scattering_transform')
+import scattering
 
-    Returns:
-        tuple: E-mode convergence map, B-mode convergence map, and E-mode alms.
+def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048,nosh=True):
     """
+    Convert shear to convergence on a sphere. In put are all healpix maps.
+    """
+
     gamma1_mask = gamma1 * mask
     gamma2_mask = gamma2 * mask
 
     KQU_masked_maps = [gamma1_mask, gamma1_mask, gamma2_mask]
     alms = hp.map2alm(KQU_masked_maps, lmax=lmax, pol=True)  # Spin transform!
+
 
     ell, emm = hp.Alm.getlm(lmax=lmax)
     if nosh:
@@ -65,21 +39,22 @@ def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048, nosh=True):
         almsB = alms[2] * 1. * ((ell * (ell + 1.)) / ((ell + 2.) * (ell - 1))) ** 0.5
     else:
         almsE = alms[1] * 1.
-        almsB = alms[2] * 1.
+        almsB = alms[2] * 1. 
     almsE[ell == 0] = 0.0
     almsB[ell == 0] = 0.0
     almsE[ell == 1] = 0.0
     almsB[ell == 1] = 0.0
 
+
+
     almssm = [alms[0], almsE, almsB]
+
 
     kappa_map_alm = hp.alm2map(almssm[0], nside=nside, lmax=lmax, pol=False)
     E_map = hp.alm2map(almssm[1], nside=nside, lmax=lmax, pol=False)
     B_map = hp.alm2map(almssm[2], nside=nside, lmax=lmax, pol=False)
 
-    return E_map, B_map, almsE
-
-
+    return E_map, B_map, almsE, almsB
 
 def compute_phmoments(file,output=''):
       
@@ -89,7 +64,7 @@ def compute_phmoments(file,output=''):
         dict_temp = np.load(file,allow_pickle=True).item()
 # 
 
-        target = file.split('/pscratch/sd/m/mgatti/Dirac/')[1].split('.npy')[0]
+        target = file.split('/global/cfs/cdirs/des/mgatti/Dirac_mocks/')[1].split('.npy')[0]
 
             
             
@@ -161,9 +136,13 @@ def compute_phmoments(file,output=''):
                     e2n[dict_temp[rel][t+1]['pix']] = dict_temp[rel][t+1]['e2n']
                     
                     mask_sims = np.in1d(np.arange(len(e1)),dict_temp[rel][t+1]['pix'])
-  
-                    f,fb,almsE , almsB   =  g2k_sphere(e1,e2, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
-                    fn,fbn, almsEN , almsBN  =  g2k_sphere(e1n,e2n, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
+                    #if rel>1:
+                    if 1==1:
+                    #    f,fb,almsE , almsB   =  g2k_sphere(-e1,-e2, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
+                    #    fn,fbn, almsEN , almsBN  =  g2k_sphere(-e1n,-e2n, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
+                    #else:
+                        f,fb,almsE , almsB   =  g2k_sphere(e1,e2, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
+                        fn,fbn, almsEN , almsBN  =  g2k_sphere(e1n,e2n, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
 
                     almsB_.append(almsB)
                     almsE_.append(almsE)
@@ -234,13 +213,13 @@ def compute_phmoments(file,output=''):
                     mcal_moments.moments_ST[label][i]['S1'] = s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten() [s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten() == s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten()]
                     mcal_moments.moments_ST[label][i]['S2'] = s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten() [s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten() == s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten()]
                     
-                    s_mean = st_calc.scattering_coef(np.load(mcal_moments.fields_patches['bk'][i]+'.npy',allow_pickle=True))
-                    label = 'BK'
-                    mcal_moments.moments_ST[label][i]= dict()
-                    mcal_moments.moments_ST[label][i]['S0'] = s_mean['S0'].cpu().data.numpy().mean(axis=0)
-                    mcal_moments.moments_ST[label][i]['S1'] = s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten() [s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten() == s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten()]
-                    mcal_moments.moments_ST[label][i]['S2'] = s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten() [s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten() == s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten()]
-                                 
+                    #s_mean = st_calc.scattering_coef(np.load(mcal_moments.fields_patches['bk'][i]+'.npy',allow_pickle=True))
+                    #label = 'BK'
+                    #mcal_moments.moments_ST[label][i]= dict()
+                    #mcal_moments.moments_ST[label][i]['S0'] = s_mean['S0'].cpu().data.numpy().mean(axis=0)
+                    #mcal_moments.moments_ST[label][i]['S1'] = s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten() [s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten() == s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten()]
+                    #mcal_moments.moments_ST[label][i]['S2'] = s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten() [s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten() == s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten()]
+                    #             
                     s_mean = st_calc.scattering_coef(np.load(mcal_moments.fields_patches['kn'][i]+'.npy',allow_pickle=True))
                     label = 'KN'
                     mcal_moments.moments_ST[label][i] = dict()
@@ -248,12 +227,12 @@ def compute_phmoments(file,output=''):
                     mcal_moments.moments_ST[label][i]['S1'] = s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten() [s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten() == s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten()]
                     mcal_moments.moments_ST[label][i]['S2'] = s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten() [s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten() == s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten()]
                                    
-                    s_mean = st_calc.scattering_coef(np.load(mcal_moments.fields_patches['bkn'][i]+'.npy',allow_pickle=True))
-                    label = 'BKN'
-                    mcal_moments.moments_ST[label][i] = dict()
-                    mcal_moments.moments_ST[label][i]['S0'] = s_mean['S0'].cpu().data.numpy().mean(axis=0)
-                    mcal_moments.moments_ST[label][i]['S1'] = s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten() [s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten() == s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten()]
-                    mcal_moments.moments_ST[label][i]['S2'] = s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten() [s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten() == s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten()]
+                    #s_mean = st_calc.scattering_coef(np.load(mcal_moments.fields_patches['bkn'][i]+'.npy',allow_pickle=True))
+                    #label = 'BKN'
+                    #mcal_moments.moments_ST[label][i] = dict()
+                    #mcal_moments.moments_ST[label][i]['S0'] = s_mean['S0'].cpu().data.numpy().mean(axis=0)
+                    #mcal_moments.moments_ST[label][i]['S1'] = s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten() [s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten() == s_mean['S1_iso'].cpu().data.numpy().mean(axis=0).flatten()]
+                    #mcal_moments.moments_ST[label][i]['S2'] = s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten() [s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten() == s_mean['S2_iso'].cpu().data.numpy().mean(axis=0).flatten()]
                             
                 #try:
                 #    #del mcal_moments.fields
@@ -281,20 +260,20 @@ def compute_phmoments(file,output=''):
                 #shutil.rmtree(output_intermediate+'/test_'+target+'_rel{0}'.format(rel))
                 #save_obj(output+'moments_'+target+'_rel{0}'.format(rel),[mcal_moments,params])
  
-#srun --nodes=1 --tasks-per-node=128   python run_PWH.py 
+#srun --nodes=4 --tasks-per-node=64   python run_ST.py 
 
 
 if __name__ == '__main__':
 
     output_intermediate = '/pscratch/sd/m/mgatti/PWHM/temp/'
-    output = '//global/cfs/cdirs/des/mgatti/Dirac/output_moments_ST_new_dirac_C/' 
-    files = glob.glob('/pscratch/sd/m/mgatti/Dirac/*')
+    output = '/global/cfs/cdirs/des/mgatti/Dirac/LFI_dv/ST/' 
+    files = glob.glob('/global/cfs/cdirs/des/mgatti/Dirac_mocks/*')
     f_= []
     for f in files:
         try:
             xx = np.int(f.split('noiserel')[1].split('.npy')[0])
 
-            if ('512' in f) and (xx>4):
+            if ('512' in f) :
                 f_.append(f)
         except:
             pass
@@ -302,11 +281,14 @@ if __name__ == '__main__':
     runstodo = []
     count =0
     for f in f_:
-        target = f.split('/pscratch/sd/m/mgatti/Dirac/')[1].split('.npy')[0]
-        if not os.path.exists(output+target+'_rel3.pkl'):
-            runstodo.append(f)
-        else:
-            count +=1
+        target = f.split('/global/cfs/cdirs/des/mgatti/Dirac_mocks/')[1].split('.npy')[0]
+        if ('_noiserel6' in f) or ('_noiserel7' in f) or ('_noiserel8' in f):
+        
+            if not os.path.exists(output+target+'_rel3.pkl'):
+                # if ('noiserel31' in target) or ('noiserel32' in target):
+                    runstodo.append(f)
+            else:
+                count +=1
 
 
 
