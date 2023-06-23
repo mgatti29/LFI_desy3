@@ -180,8 +180,7 @@ def make_maps(input_):
     #  ********************************************************************************************
 
     # let's read raw particle numbers and make lens files:
-    
-    path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(20,config['nside'])
+    path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(30,config['nside'])
     if not os.path.exists(path_):
         for s in frogress.bar(range(len(resume['Step']))):
 
@@ -231,7 +230,7 @@ def make_maps(input_):
             
     
     # this is at reasonably high redshift...
-    path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(20,config['nside'])
+    path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(30,config['nside'])
 
 
     
@@ -268,9 +267,6 @@ def make_maps(input_):
     if not os.path.exists(path_):
         
     # let's make kappa files *************************************************************************
-
-
-
         overdensity_array = [np.zeros(hp.nside2npix(config['nside_intermediate']))]
         print ('load lens')
         for i in frogress.bar(range(len(resume['Step']))):
@@ -592,11 +588,11 @@ def make_maps(input_):
                 unique_pix, idx, idx_rep = np.unique(pix, return_index=True, return_inverse=True)
 
 
-                e1r_map[unique_pix] += np.bincount(idx_rep, weights=es1*w)
-                e2r_map[unique_pix] += np.bincount(idx_rep, weights=es2*w)
+                e1r_map[unique_pix] += np.bincount(idx_rep, weights=es1*w/np.sqrt(corr[tomo_bin-1]))
+                e2r_map[unique_pix] += np.bincount(idx_rep, weights=es2*w/np.sqrt(corr[tomo_bin-1]))
 
-                e1r_map0[unique_pix] += np.bincount(idx_rep, weights=es1a*w)
-                e2r_map0[unique_pix] += np.bincount(idx_rep, weights=es2a*w)
+                e1r_map0[unique_pix] += np.bincount(idx_rep, weights=es1a*w/np.sqrt(corr[tomo_bin-1]))
+                e2r_map0[unique_pix] += np.bincount(idx_rep, weights=es2a*w/np.sqrt(corr[tomo_bin-1]))
 
 
                 g1_map[unique_pix] += np.bincount(idx_rep, weights= g1_*w)
@@ -642,7 +638,7 @@ def make_maps(input_):
 
     
 
-
+corr = [1.0608,1.0295,1.0188,1.0115]
 
 
 SC = True
