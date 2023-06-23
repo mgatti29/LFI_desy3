@@ -1,111 +1,51 @@
-from bornraytrace import lensing
 import bornraytrace
+from bornraytrace import lensing
+from bornraytrace import lensing as brk
+from bornraytrace import intrinsic_alignments as iaa
 import gc
 import pyfits as pf
-import pickle
 import numpy as np
 import healpy as hp
+import pandas as pd
+import pickle
 import os
 import copy
 import scipy
 from scipy.interpolate import interp1d
 import timeit
-from bornraytrace import lensing as brk
 from astropy import units as u
-import gc
-from bornraytrace import intrinsic_alignments as iaa
+from astropy.table import Table  
+from astropy.cosmology import z_at_value
 from Moments_analysis import convert_to_pix_coord, IndexToDeclRa, apply_random_rotation, addSourceEllipticity, gk_inv
 import frogress
-from astropy.table import Table  
-import pandas as pd
-from astropy.cosmology import z_at_value
-import sys
-sys.path.insert(0, "/global/homes/m/mgatti/PKDGRAV/lfi_project/scripts/")
-from utility import *
-
-
-
-
-import pickle
-import numpy as np
-import healpy as hp
-
 def save_obj(name, obj):
-    """
-    Saves an object to a pickle file.
-
-    Args:
-        name (str): The name of the pickle file.
-        obj (object): The object to be saved.
-    """
     with open(name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, protocol=2)
         f.close()
 
 def load_obj(name):
-    """
-    Loads an object from a pickle file.
-
-    Args:
-        name (str): The name of the pickle file.
-
-    Returns:
-        object: The loaded object.
-    """
     with open(name + '.pkl', 'rb') as f:
-        mute = pickle.load(f)
+        mute =  pickle.load(f)
         f.close()
     return mute
+import sys
 
-def random_draw_ell_from_w(wi, w, e1, e2):
+sys.path.insert(0, "/global/homes/m/mgatti/PKDGRAV/lfi_project/scripts/")
+from utility import *
+
+
+
+def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048,nosh=True):
     """
-    Draws ellipticities from given weights and galaxy ellipticities.
-
-    Args:
-        wi (array): Input weights.
-        w (array): All weights of the catalog.
-        e1 (array): Galaxy ellipticities (component 1).
-        e2 (array): Galaxy ellipticities (component 2).
-
-    Returns:
-        tuple: Randomly drawn ellipticities.
+    Convert shear to convergence on a sphere. In put are all healpix maps.
     """
-    ell_cont = dict()
-    for w_ in np.unique(w):
-        mask_ = w == w_
-        w__ = np.int(w_ * 10000)
-        ell_cont[w__] = [e1[mask_], e2[mask_]]
 
-    e1_ = np.zeros(len(wi))
-    e2_ = np.zeros(len(wi))
-
-    for w_ in np.unique(wi):
-        mask_ = (wi * 10000).astype(np.int) == np.int(w_ * 10000)
-        e1_[mask_] = ell_cont[np.int(w_ * 10000)][0][np.random.randint(0, len(ell_cont[np.int(w_ * 10000)][0]), len(e1_[mask_]))]
-        e2_[mask_] = ell_cont[np.int(w_ * 10000)][1][np.random.randint(0, len(ell_cont[np.int(w_ * 10000)][0]), len(e1_[mask_]))]
-
-    return e1_, e2_
-
-def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048, nosh=True):
-    """
-    Converts shear to convergence on a sphere using HEALPix maps.
-
-    Args:
-        gamma1 (array): Gamma1 shear map.
-        gamma2 (array): Gamma2 shear map.
-        mask (array): Mask for the maps.
-        nside (int, optional): HEALPix nside parameter. Defaults to 1024.
-        lmax (int, optional): Maximum multipole moment. Defaults to 2048.
-        nosh (bool, optional): Flag indicating whether to remove the monopole and dipole terms. Defaults to True.
-
-    Returns:
-        tuple: E-mode convergence map, B-mode convergence map, and E-mode alms.
-    """
     gamma1_mask = gamma1 * mask
     gamma2_mask = gamma2 * mask
 
     KQU_masked_maps = [gamma1_mask, gamma1_mask, gamma2_mask]
     alms = hp.map2alm(KQU_masked_maps, lmax=lmax, pol=True)  # Spin transform!
+
 
     ell, emm = hp.Alm.getlm(lmax=lmax)
     if nosh:
@@ -113,13 +53,16 @@ def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048, nosh=True):
         almsB = alms[2] * 1. * ((ell * (ell + 1.)) / ((ell + 2.) * (ell - 1))) ** 0.5
     else:
         almsE = alms[1] * 1.
-        almsB = alms[2] * 1.
+        almsB = alms[2] * 1. 
     almsE[ell == 0] = 0.0
     almsB[ell == 0] = 0.0
     almsE[ell == 1] = 0.0
     almsB[ell == 1] = 0.0
 
+
+
     almssm = [alms[0], almsE, almsB]
+
 
     kappa_map_alm = hp.alm2map(almssm[0], nside=nside, lmax=lmax, pol=False)
     E_map = hp.alm2map(almssm[1], nside=nside, lmax=lmax, pol=False)
@@ -127,19 +70,8 @@ def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048, nosh=True):
 
     return E_map, B_map, almsE
 
-def rotate_map_approx(mask, rot_angles, flip=False, nside=1024):
-    """
-    Rotates a mask map approximately using rotation angles.
 
-    Args:
-        mask (array): Input mask map.
-        rot_angles (float or array): Rotation angles in degrees.
-        flip (bool, optional): Flag indicating whether to flip the map. Defaults to False.
-        nside (int, optional): HEALPix nside parameter. Defaults to 1024.
-
-    Returns:
-        array: Rotated mask map.
-    """
+def rotate_map_approx(mask, rot_angles, flip=False,nside = 1024):
     alpha, delta = hp.pix2ang(nside, np.arange(len(mask)))
 
     rot = hp.rotator.Rotator(rot=rot_angles, deg=True)
@@ -147,14 +79,21 @@ def rotate_map_approx(mask, rot_angles, flip=False, nside=1024):
     if not flip:
         rot_i = hp.ang2pix(nside, rot_alpha, rot_delta)
     else:
-        rot_i = hp.ang2pix(nside, np.pi - rot_alpha, rot_delta)
-    rot_map = mask * 0.
-    rot_map[rot_i] = mask[np.arange(len(mask))]
-
+        rot_i = hp.ang2pix(nside, np.pi-rot_alpha, rot_delta)
+    rot_map = mask*0.
+    rot_map[rot_i] =  mask[np.arange(len(mask))]
     return rot_map
 
 
 
+'''
+This code takes the output of pkdgrav sims. It generates simulated des y3 like catalogs, adding shape noise and weights from the fiducial des y3 catalog on data. 
+
+how to run it in parallel (when you have multiple  sims:
+srun --nodes=4 --tasks-per-node=64 python populate_mocks_corr.py
+
+
+'''
 
   
 
@@ -163,23 +102,20 @@ def rotate_map_approx(mask, rot_angles, flip=False, nside=1024):
 
 
 
-def make_maps(info):
+def make_maps(input_):
+ 
+    # reads seed of the mock and folder
+    [seed,folder] = input_
 
-    '''
-    This code takes the output of pkdgrav sims, and it generates simulated des y3 like catalogs, adding shape noise and weights from the fiducial des y3 catalog on data. 
-    how to run it in parallel (when you have multiple  sims):
-    srun --nodes=4 --tasks-per-node=64 python populate_mocks_corr.py
-    '''
-    [seed,folder] = info
-    # params files:
-    #seed = 120
-    # label
+    #convert to the right format the seed
     if seed <10:
         mock_number = '00{0}'.format(seed)
     elif (seed>=10) & (seed<100):
         mock_number = '0{0}'.format(seed)
     elif (seed>=100):
         mock_number = '{0}'.format(seed)
+        
+    #makes folder if it doesn't exist
     try: 
         if not os.path.exists(config['output']+'/runs{0}/'.format(folder,mock_number)):
             os.mkdir(config['output']+'/runs{0}/'.format(folder,mock_number))
@@ -192,12 +128,13 @@ def make_maps(info):
     except:
         pass  
 
+    # path to folders
     path_folder = config['path_mocks']+'/runs{0}/'.format(folder)+'/run{1}/'.format(folder,mock_number)
     path_folder_output = config['output']+'/runs{0}//run{1}/'.format(folder,mock_number)
 
 
-  
-    # read cosmological parameters
+    
+    # this reads the cosmological parameter of the simulations
     f = open(('params_run_1_Niall_{0}.txt'.format(folder)),'r')
     om_ = []
     h_ = []
@@ -238,8 +175,12 @@ def make_maps(info):
     run_param_sample = np.genfromtxt('params_run_1_Niall_{0}.txt'.format(folder),delimiter=',')[seed-1]
     w0 = run_param_sample[2]
   
+
+   
+    #  ********************************************************************************************
+
     # let's read raw particle numbers and make lens files:
-  
+    
     path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(20,config['nside'])
     if not os.path.exists(path_):
         for s in frogress.bar(range(len(resume['Step']))):
@@ -292,6 +233,8 @@ def make_maps(info):
     # this is at reasonably high redshift...
     path_ = path_folder_output+'/kappa_{0}_{1}.fits'.format(20,config['nside'])
 
+
+    
     kappa_pref_evaluated = brk.kappa_prefactor(h,om, length_unit = 'Mpc')
     
     
@@ -302,7 +245,7 @@ def make_maps(info):
     z_bin_edges[0] = 1e-6
     from astropy.cosmology import FlatLambdaCDM,wCDM
 
-    
+
     cosmology = wCDM(H0= h,
                  Om0=om,#mega_fld,
                  Ode0=1-om,#Omega_fld,
@@ -313,7 +256,6 @@ def make_maps(info):
     
     comoving_edges =  [cosmology.comoving_distance(x_) for x_ in np.array((z_bin_edges))]
     
-    
 
     
     un_ = comoving_edges[:i][0].unit
@@ -321,10 +263,7 @@ def make_maps(info):
     comoving_edges = comoving_edges*un_
 
     
-    # new from file --------------------------------
-    #comoving_edges = np.hstack([0,resume['cmd_far'][::-1]])*un_
-    
-    
+
 
     if not os.path.exists(path_):
         
@@ -547,14 +486,15 @@ def make_maps(info):
 
 
 
-
+            # let's make DES mock catalogs
 
             config['nside2'] = 512 
-            depth_weigth = np.load('/global/cfs/cdirs/des/mass_maps/Maps_final/depth_maps_Y3_{0}_numbdensity.npy'.format(config['nside2']),allow_pickle=True).item()
 
             for tomo_bin in config['sources_bins']:
 
                 sources_cat[rot][tomo_bin] = dict()
+                
+                # load into memory the des y3 mock catalogue
                 mcal_catalog = load_obj('/global/cfs/cdirs/des/mass_maps/Maps_final/data_catalogs_weighted_{0}'.format(tomo_bin-1))
                 
                 pix_ = convert_to_pix_coord(mcal_catalog['ra'], mcal_catalog['dec'], nside=config['nside2'])
@@ -563,6 +503,7 @@ def make_maps(info):
                 e2 = mcal_catalog['e2']
                 w  = mcal_catalog['w']
                 
+                # we can cut 4 des y3 footprint out of the full sky. this is controlled by the 'rot' parameter
                 if rot ==0:
                     rot_angles = [0, 0, 0]
                     flip=False
@@ -610,8 +551,8 @@ def make_maps(info):
 
                 del mcal_catalog
                 gc.collect() 
-
-
+                
+                # the factor f controls the source clustering effect on shape noise
                 f = 1./np.sqrt(d_tomo[tomo_bin]/np.sum(nz_kernel_sample_dict[tomo_bin]))
 
                 f = f[pix]
@@ -704,7 +645,7 @@ def make_maps(info):
 
 
 
-SC = False
+SC = True
 
 if __name__ == '__main__':
     
@@ -719,13 +660,13 @@ if __name__ == '__main__':
     runstodo=[]
     for folder_ in folders:
         config = dict()
-        config['noise_rel'] = 102
+        config['noise_rel'] = 9
         config['2PT_FILE'] = '//global/cfs/cdirs//des/www/y3_chains/data_vectors/2pt_NG_final_2ptunblind_02_26_21_wnz_maglim_covupdate_6000HR.fits'
         config['nside_intermediate'] = 1024
         config['nside'] = 512
         config['path_mocks'] = '/global/cfs/cdirs/des/dirac_sims/original_files/'
         #/global/cfs/cdirs/des/mgatti/Dirac
-        config['output'] = '/pscratch/sd/m/mgatti/Dirac/' #/global/cfs/cdirs/des/dirac_sims/derived_products/'
+        config['output'] = '/global/cfs/cdirs/des/mgatti/Dirac_mocks/' #/global/cfs/cdirs/des/dirac_sims/derived_products/'
         config['sources_bins'] = [1,2,3,4]#,2,3,4]#,2,3,4] #1,2,3,4
 
         config['m_sources'] = [-0.002,-0.017,-0.029,-0.038]#,[-0.006,-.01,-0.026,-0.032]
@@ -779,8 +720,7 @@ if __name__ == '__main__':
     #make_maps(runstodo[0]) 
       
     
-    #make_maps([30,'M'])
-    
+
     from mpi4py import MPI 
 ### 
     while run_count<len(runstodo):
@@ -795,4 +735,4 @@ if __name__ == '__main__':
         run_count+=comm.size
         comm.bcast(run_count,root = 0)
         comm.Barrier() 
-       
+ 
