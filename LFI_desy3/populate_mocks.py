@@ -558,18 +558,21 @@ def make_maps(input_):
 
                 # ++++++++++++++++++++++
  
+                n_map = np.zeros(hp.nside2npix(config['nside2']))
                 n_map_sc = np.zeros(hp.nside2npix(config['nside2']))
 
                 unique_pix, idx, idx_rep = np.unique(pix, return_index=True, return_inverse=True)
 
        
                 n_map_sc[unique_pix] += np.bincount(idx_rep, weights=w/f**2)
+                n_map[unique_pix] += np.bincount(idx_rep, weights=w)
 
                 g1_ = g1_tomo[tomo_bin][pix]
                 g2_ = g2_tomo[tomo_bin][pix]
 
 
                 es1,es2 = apply_random_rotation(e1/f, e2/f)
+                es1_ref,es2_ref = apply_random_rotation(e1, e2)
                 es1a,es2a = apply_random_rotation(e1/f, e2/f)
 
 
@@ -582,19 +585,46 @@ def make_maps(input_):
                 e1r_map0 = np.zeros(hp.nside2npix(config['nside2']))
                 e2r_map0 = np.zeros(hp.nside2npix(config['nside2']))
 
+                e1r_map0_ref = np.zeros(hp.nside2npix(config['nside2']))
+                e2r_map0_ref = np.zeros(hp.nside2npix(config['nside2']))
+
                 g1_map = np.zeros(hp.nside2npix(config['nside2']))
                 g2_map = np.zeros(hp.nside2npix(config['nside2']))
 
                 unique_pix, idx, idx_rep = np.unique(pix, return_index=True, return_inverse=True)
 
 
-                e1r_map[unique_pix] += np.bincount(idx_rep, weights=es1*w/np.sqrt(corr[tomo_bin-1]))
-                e2r_map[unique_pix] += np.bincount(idx_rep, weights=es2*w/np.sqrt(corr[tomo_bin-1]))
+                e1r_map[unique_pix] += np.bincount(idx_rep, weights=es1*w)
+                e2r_map[unique_pix] += np.bincount(idx_rep, weights=es2*w)
 
-                e1r_map0[unique_pix] += np.bincount(idx_rep, weights=es1a*w/np.sqrt(corr[tomo_bin-1]))
-                e2r_map0[unique_pix] += np.bincount(idx_rep, weights=es2a*w/np.sqrt(corr[tomo_bin-1]))
+                e1r_map0[unique_pix] += np.bincount(idx_rep, weights=es1a*w)
+                e2r_map0[unique_pix] += np.bincount(idx_rep, weights=es2a*w)
 
+                e1r_map0_ref[unique_pix] += np.bincount(idx_rep, weights=es1_ref*w)
+                e2r_map0_ref[unique_pix] += np.bincount(idx_rep, weights=es2_ref*w)
 
+                
+                mask_sims = n_map_sc != 0.
+                e1r_map[mask_sims]  = e1r_map[mask_sims]/(n_map_sc[mask_sims])
+                e2r_map[mask_sims] =  e2r_map[mask_sims]/(n_map_sc[mask_sims])
+                e1r_map0[mask_sims]  = e1r_map0[mask_sims]/(n_map_sc[mask_sims])
+                e2r_map0[mask_sims] =  e2r_map0[mask_sims]/(n_map_sc[mask_sims])
+                e1r_map0_ref[mask_sims]  = e1r_map0_ref[mask_sims]/(n_map[mask_sims])
+                e2r_map0_ref[mask_sims] =  e2r_map0_ref[mask_sims]/(n_map[mask_sims])
+                
+                   
+                
+                var_ =  e1r_map0_ref**2+e2r_map0_ref**2
+
+    
+                #'''
+                e1r_map[unique_pix]  *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+                e2r_map[unique_pix]  *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+                e1r_map0[unique_pix] *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+                e2r_map0[unique_pix] *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+
+                
+                #'''
                 g1_map[unique_pix] += np.bincount(idx_rep, weights= g1_*w)
                 g2_map[unique_pix] += np.bincount(idx_rep, weights= g2_*w)
 
@@ -604,11 +634,7 @@ def make_maps(input_):
 
 
 
-                mask_sims = n_map_sc != 0.
-                e1r_map[mask_sims]  = e1r_map[mask_sims]/(n_map_sc[mask_sims])
-                e2r_map[mask_sims] =  e2r_map[mask_sims]/(n_map_sc[mask_sims])
-                e1r_map0[mask_sims]  = e1r_map0[mask_sims]/(n_map_sc[mask_sims])
-                e2r_map0[mask_sims] =  e2r_map0[mask_sims]/(n_map_sc[mask_sims])
+
                 g1_map[mask_sims]  = g1_map[mask_sims]/(n_map_sc[mask_sims])
                 g2_map[mask_sims] =  g2_map[mask_sims]/(n_map_sc[mask_sims])
                 
@@ -639,7 +665,7 @@ def make_maps(input_):
     
 
 corr = [1.0608,1.0295,1.0188,1.0115]
-
+coeff_kurtosis = [0.1,0.05,0.036,0.036]
 
 SC = True
 
