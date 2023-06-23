@@ -60,7 +60,7 @@ def compute_phmoments(file,output=''):
         dict_temp = np.load(file,allow_pickle=True).item()
 # 
 
-        target = file.split('/pscratch/sd/m/mgatti/Dirac/')[1].split('.npy')[0]
+        target = file.split('/global/cfs/cdirs/des/mgatti/Dirac_mocks//')[1].split('.npy')[0]
 
             
             
@@ -200,7 +200,7 @@ if __name__ == '__main__':
     #path to projectdir where to stor final DVs
     output = '/global/cfs/cdirs/des/mgatti/Dirac/LFI_dv/moments/' 
     # path to sims
-    files = glob.glob('/pscratch/sd/m/mgatti/Dirac/*')
+    files = glob.glob('/global/cfs/cdirs/des/mgatti/Dirac_mocks//*')
     f_= []
     for f in files:
         if ('_noiserel100' in f) or ('_noiserel101' in f) or ('_noiserel102' in f):
@@ -211,7 +211,7 @@ if __name__ == '__main__':
     count =0
     for f in f_:
         
-        target = f.split('/pscratch/sd/m/mgatti/Dirac/')[1].split('.npy')[0]
+        target = f.split('/global/cfs/cdirs/des/mgatti/Dirac_mocks/')[1].split('.npy')[0]
         if not os.path.exists(output+target+'_rel3.pkl'):
                 runstodo.append(f)
         else:
