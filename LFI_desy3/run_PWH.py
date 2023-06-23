@@ -5,55 +5,29 @@ import numpy as np
 import gc
 import pickle
 import healpy as hp
-
-
 def save_obj(name, obj):
-    """
-    Saves an object to a pickle file.
-
-    Args:
-        name (str): The name of the pickle file.
-        obj (object): The object to be saved.
-    """
     with open(name + '.pkl', 'wb') as f:
         pickle.dump(obj, f, protocol=2)
         f.close()
 
 def load_obj(name):
-    """
-    Loads an object from a pickle file.
-
-    Args:
-        name (str): The name of the pickle file.
-
-    Returns:
-        object: The loaded object.
-    """
     with open(name + '.pkl', 'rb') as f:
-        mute = pickle.load(f)
+        mute =  pickle.load(f)
         f.close()
     return mute
 
-def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048, nosh=True):
-    """
-    Converts shear to convergence on a sphere using HEALPix maps.
 
-    Args:
-        gamma1 (array): Gamma1 shear map.
-        gamma2 (array): Gamma2 shear map.
-        mask (array): Mask for the maps.
-        nside (int, optional): HEALPix nside parameter. Defaults to 1024.
-        lmax (int, optional): Maximum multipole moment. Defaults to 2048.
-        nosh (bool, optional): Flag indicating whether to remove the monopole and dipole terms. Defaults to True.
-
-    Returns:
-        tuple: E-mode convergence map, B-mode convergence map, and E-mode alms.
+def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048,nosh=True):
     """
+    Convert shear to convergence on a sphere. In put are all healpix maps.
+    """
+
     gamma1_mask = gamma1 * mask
     gamma2_mask = gamma2 * mask
 
     KQU_masked_maps = [gamma1_mask, gamma1_mask, gamma2_mask]
     alms = hp.map2alm(KQU_masked_maps, lmax=lmax, pol=True)  # Spin transform!
+
 
     ell, emm = hp.Alm.getlm(lmax=lmax)
     if nosh:
@@ -61,21 +35,22 @@ def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048, nosh=True):
         almsB = alms[2] * 1. * ((ell * (ell + 1.)) / ((ell + 2.) * (ell - 1))) ** 0.5
     else:
         almsE = alms[1] * 1.
-        almsB = alms[2] * 1.
+        almsB = alms[2] * 1. 
     almsE[ell == 0] = 0.0
     almsB[ell == 0] = 0.0
     almsE[ell == 1] = 0.0
     almsB[ell == 1] = 0.0
 
+
+
     almssm = [alms[0], almsE, almsB]
+
 
     kappa_map_alm = hp.alm2map(almssm[0], nside=nside, lmax=lmax, pol=False)
     E_map = hp.alm2map(almssm[1], nside=nside, lmax=lmax, pol=False)
     B_map = hp.alm2map(almssm[2], nside=nside, lmax=lmax, pol=False)
 
     return E_map, B_map, almsE
-
-
 
 def compute_phmoments(file,output=''):
       
@@ -85,7 +60,7 @@ def compute_phmoments(file,output=''):
         dict_temp = np.load(file,allow_pickle=True).item()
 # 
 
-        target = file.split('/pscratch/sd/m/mgatti/Dirac/')[1].split('.npy')[0]
+        target = file.split('/global/cfs/cdirs/des/mgatti/Dirac_mocks/')[1].split('.npy')[0]
 
             
             
@@ -110,7 +85,7 @@ def compute_phmoments(file,output=''):
                 print (f_)
 
 
-        for rel in range(4):
+        for rel in range(3,4):
             params = dict()
             params['om'] = om_[run-1]
             params['h'] = h_[run-1]
@@ -132,7 +107,7 @@ def compute_phmoments(file,output=''):
                 conf['nside'] = 512
                 conf['lmax'] = conf['nside']*2
                 conf['verbose'] = False
-                conf['output_folder'] = output_intermediate+'/test_'+target+'_rel{0}'.format(rel)
+                conf['output_folder'] = output_intermediate+'/Atest_'+target+'_rel{0}'.format(rel)
 
 
                 mcal_moments = moments_map(conf)
@@ -148,15 +123,16 @@ def compute_phmoments(file,output=''):
                     e1n = np.zeros(hp.nside2npix(conf['nside']))
                     e2n = np.zeros(hp.nside2npix(conf['nside']))
                     e1[dict_temp[rel][t+1]['pix']] = dict_temp[rel][t+1]['e1']
-                    e2[dict_temp[rel][t+1]['pix']] = -dict_temp[rel][t+1]['e2']
+                    e2[dict_temp[rel][t+1]['pix']] = dict_temp[rel][t+1]['e2']
                     e1n[dict_temp[rel][t+1]['pix']] = dict_temp[rel][t+1]['e1n']
-                    e2n[dict_temp[rel][t+1]['pix']] = -dict_temp[rel][t+1]['e2n']
+                    e2n[dict_temp[rel][t+1]['pix']] = dict_temp[rel][t+1]['e2n']
                     
                     mask_sims = np.in1d(np.arange(len(e1)),dict_temp[rel][t+1]['pix'])
-                    if rel>1:
-                        f,fb,almsE    =  g2k_sphere(-e1,-e2, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
-                        fn,fbn, almsEN   =  g2k_sphere(-e1n,-e2n, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
-                    else:
+                    #if rel>1:
+                    if 1==1:
+                        #f,fb,almsE    =  g2k_sphere(-e1,-e2, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
+                        #fn,fbn, almsEN   =  g2k_sphere(-e1n,-e2n, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
+                    #else:
                         f,fb,almsE    =  g2k_sphere(e1,e2, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
                         fn,fbn, almsEN   =  g2k_sphere(e1n,e2n, mask_sims, nside=conf['nside'], lmax=conf['nside']*2 ,nosh=True)
 
@@ -209,7 +185,7 @@ def compute_phmoments(file,output=''):
                 print ('KK')
                 mcal_moments.compute_moments_pywhm(label = 'KK',field1='k',field2='k')
 #
-#
+##
                 print ('compute moments')
                 mcal_moments.compute_moments_pywhm(label = 'bNK',field1='bkn',field2='bk')
                 print ('KN')
@@ -218,8 +194,7 @@ def compute_phmoments(file,output=''):
                 mcal_moments.compute_moments_pywhm(label = 'bNN',field1='bkn',field2='bkn')
                 print ('KK')
                 mcal_moments.compute_moments_pywhm(label = 'bKK',field1='bk',field2='bk')
-
-
+#
 
                 try:
                     #del mcal_moments.fields
@@ -231,24 +206,25 @@ def compute_phmoments(file,output=''):
                 #print ('save')
 
                 import shutil
-                shutil.rmtree(output_intermediate+'/test_'+target+'_rel{0}'.format(rel))
                 save_obj(output+target+'_rel{0}'.format(rel),[mcal_moments,params])
  
+                shutil.rmtree(output_intermediate+'/Atest_'+target+'_rel{0}'.format(rel))
+                
 
-#srun --nodes=1 --tasks-per-node=128   python run_PWH.py 
+#srun --nodes=4 --tasks-per-node=64   python run_PWH.py 
 
 
 if __name__ == '__main__':
 
     output_intermediate = '/pscratch/sd/m/mgatti/PWHM/temp/'
-    output = '//global/cfs/cdirs/des/mgatti/Dirac/output_moments_new_dirac_C/' 
-    files = glob.glob('/pscratch/sd/m/mgatti/Dirac/*')
+    output = '/global/cfs/cdirs/des/mgatti/Dirac/LFI_dv/WPH/' 
+    files = glob.glob('/global/cfs/cdirs/des/mgatti/Dirac_mocks/*')
     f_= []
     for f in files:
         try:
             xx = np.int(f.split('noiserel')[1].split('.npy')[0])
 
-            if ('512' in f) and (xx>4):
+            if ('512' in f) :
                 f_.append(f)
         except:
             pass
@@ -256,9 +232,11 @@ if __name__ == '__main__':
     runstodo = []
     count =0
     for f in f_:
-        target = f.split('/pscratch/sd/m/mgatti/Dirac/')[1].split('.npy')[0]
+        target = f.split('/global/cfs/cdirs/des/mgatti/Dirac_mocks/')[1].split('.npy')[0]
         if not os.path.exists(output+target+'_rel3.pkl'):
-            runstodo.append(f)
+            if ('_noiserel6' in target) or ('_noiserel7' in target) or ('_noiserel8' in target):
+        
+                runstodo.append(f)
         else:
             count +=1
 
@@ -267,16 +245,19 @@ if __name__ == '__main__':
     
     print (len(runstodo),count)
     run_count=0
+    #compute_phmoments(runstodo[run_count],output)
     from mpi4py import MPI 
     while run_count<len(runstodo):
         comm = MPI.COMM_WORLD
 #
         if (run_count+comm.rank)<len(runstodo):
-            compute_phmoments(runstodo[run_count+comm.rank],output)
-                
+            try:
+                compute_phmoments(runstodo[run_count+comm.rank],output)
+            except:
+                pass
         #if (run_count)<len(runstodo):
         #    make_maps(runstodo[run_count])
         run_count+=comm.size
         comm.bcast(run_count,root = 0)
         comm.Barrier() 
-#
+##srun --nodes=4 --tasks-per-node=64   python run_PWH.py 
