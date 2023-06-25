@@ -274,7 +274,9 @@ def make_maps(seed):
     for the original, let's download the 2048 and downgrade them to 1024.
     shell_ = hp.ud_grade(shell_,nside_out=config['nside_intermediate'])
     '''
+    #
     shell = np.load(path_sims+'/run_{0}//shells_nside=512.npz'.format(config['f']))
+    shell = np.load(path_sims+'/run_{0}//compressed_shells.npz'.format(config['f']))
 
 
     from ekit import paths as path_tools
@@ -289,27 +291,25 @@ def make_maps(seed):
 
     z_bin_edges = np.hstack([z_bounds['z-low'],z_bounds['z-high'][-1]])
     
-    '''
-    for s_ in (range(len(z_bounds['z-high']))):
+  
+    # SAVE LENS MAPS  *****************************************************************
+    for s_ in frogress.bar(range(len(z_bounds['z-high']))):
         path_ = base+'/lens_{0}_{1}.fits'.format(s_,config['nside_out'])
         if not os.path.exists(path_):
-            try:
-                shell_ = shell['shells'][i_sprt[s_]]
-                shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
-                #shell_ = hp.ud_grade(shell_, nside_out = config['nside_out'])
+            shell_ = shell['shells'][i_sprt[s_]]
+            shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
+            shell_ = hp.ud_grade(shell_, nside_out = config['nside_out'])
 
-                fits_f = Table()
-                fits_f['T'] = shell_
-                if os.path.exists(path_):
-                    os.remove(path_)
-                fits_f.write(path_)
-            except:
-                pass
-    '''
+            fits_f = Table()
+            fits_f['T'] = shell_
+            if os.path.exists(path_):
+                os.remove(path_)
+            fits_f.write(path_)
+                
     path_ = base+'/gg_{0}_{1}.fits'.format(len(z_bounds['z-high'])-1,config['nside_out'])
     if not os.path.exists(path_):
         # SAVE LENS MAPS  *****************************************************************
-        for s_ in (range(len(z_bounds['z-high']))):
+        for s_ in frogress.bar(range(len(z_bounds['z-high']))):
             path_ = base+'/lens_{0}_{1}.fits'.format(s_,config['nside_out'])
             if not os.path.exists(path_):
                 shell_ = shell['shells'][i_sprt[s_]]
@@ -361,7 +361,7 @@ def make_maps(seed):
     if not os.path.exists(path_):
 
         #print ('load lens')
-        for s_ in (range(len(z_bounds['z-high']))):
+        for s_ in frogress.bar(range(len(z_bounds['z-high']))):
             try:
                 path_ = base+'/lens_{0}_{1}.fits'.format(s_,config['nside_intermediate'])
                 m_ = pf.open(path_)
@@ -379,7 +379,7 @@ def make_maps(seed):
         kappa_lensing = np.copy(overdensity_array)*0.
 
 
-        for i in (np.arange(kappa_lensing.shape[0])):
+        for i in frogress.bar(np.arange(kappa_lensing.shape[0])):
             try:
                 kappa_lensing[i] = lensing.raytrace(cosmology.H0, cosmology.Om0,
                                              overdensity_array=overdensity_array[:i].T,
@@ -390,7 +390,7 @@ def make_maps(seed):
                
 
         # make g1 and g2 ---
-        for i in (range(kappa_lensing.shape[0])):
+        for i in frogress.bar(range(kappa_lensing.shape[0])):
             path_ = base+'/gg_{0}_{1}.fits'.format(i,config['nside_out'])
             try:
                  os.remove(path_)
@@ -412,7 +412,7 @@ def make_maps(seed):
                 fits_f['g2_IA'] = hp.ud_grade(g2_IA,nside_out =config['nside_out'])
 
                 fits_f.write(path_)
-                path_ = base+'/lens_{0}_{1}.fits'.format(i,config['nside_out'])
+                path_ = base+'/lens_{0}_{1}.fits'.format(i,config['nside_intermediate'])
                 os.system('rm {0}'.format(path_))
 
 
@@ -450,7 +450,7 @@ def make_maps(seed):
     if not os.path.exists(path_):
         # SAVE LENS MAPS  *****************************************************************
         for s_ in (range(len(z_bounds['z-high']))):
-            path_ = base+'/lens_{0}_{1}.fits'.format(s_,config['nside_out'])
+            path_ = base_b+'/lens_{0}_{1}.fits'.format(s_,config['nside_out'])
             if not os.path.exists(path_):
                 shell_ = shell['shells'][i_sprt[s_]]
                 shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
@@ -464,7 +464,7 @@ def make_maps(seed):
 
 
 
-            path_ = base+'/lens_{0}_{1}.fits'.format(s_,config['nside_intermediate'])
+            path_ = base_b+'/lens_{0}_{1}.fits'.format(s_,config['nside_intermediate'])
             if not os.path.exists(path_):
                 shell_ = shell['shells'][i_sprt[s_]]
                 shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
@@ -538,7 +538,7 @@ def make_maps(seed):
         # make g1 and g2 ---
         # make g1 and g2 ---
         for i in (range(kappa_lensing.shape[0])):
-            path_ = base+'/gg_{0}_{1}.fits'.format(i,config['nside_out'])
+            path_ = base_b+'/gg_{0}_{1}.fits'.format(i,config['nside_out'])
             try:
                  os.remove(path_)
             except:
@@ -559,7 +559,7 @@ def make_maps(seed):
                 fits_f['g2_IA'] = hp.ud_grade(g2_IA,nside_out =config['nside_out'])
 
                 fits_f.write(path_)
-                path_ = base+'/lens_{0}_{1}.fits'.format(i,config['nside_out'])
+                path_ = base_b+'/lens_{0}_{1}.fits'.format(i,config['nside_out'])
                 os.system('rm {0}'.format(path_))
                 
                 
@@ -1039,7 +1039,8 @@ if __name__ == '__main__':
 
     print (len(runstodo),count,miss)
 
-
+    make_maps(runstodo[0])
+    '''
     run_count=0
     
     from mpi4py import MPI
@@ -1056,7 +1057,7 @@ if __name__ == '__main__':
         run_count+=comm.size
         comm.bcast(run_count,root = 0)
         comm.Barrier()
-       
+    '''     
 
    # while run_count<len(runstodo):
    #     
