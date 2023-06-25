@@ -90,7 +90,7 @@ def rotate_map_approx(mask, rot_angles, flip=False,nside = 1024):
 This code takes the output of pkdgrav sims. It generates simulated des y3 like catalogs, adding shape noise and weights from the fiducial des y3 catalog on data. 
 
 how to run it in parallel (when you have multiple  sims:
-srun --nodes=4 --tasks-per-node=64 python populate_mocks_corr.py
+srun --nodes=1 --tasks-per-node=64 python populate_mocks_corr.py
 
 
 '''
@@ -618,10 +618,10 @@ def make_maps(input_):
 
     
                 #'''
-                e1r_map[unique_pix]  *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
-                e2r_map[unique_pix]  *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
-                e1r_map0[unique_pix] *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
-                e2r_map0[unique_pix] *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+                e1r_map   *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+                e2r_map   *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+                e1r_map0 *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+                e2r_map0 *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
 
                 
                 #'''
@@ -682,7 +682,7 @@ if __name__ == '__main__':
     runstodo=[]
     for folder_ in folders:
         config = dict()
-        config['noise_rel'] = 9
+        config['noise_rel'] = 0
         config['2PT_FILE'] = '//global/cfs/cdirs//des/www/y3_chains/data_vectors/2pt_NG_final_2ptunblind_02_26_21_wnz_maglim_covupdate_6000HR.fits'
         config['nside_intermediate'] = 1024
         config['nside'] = 512
