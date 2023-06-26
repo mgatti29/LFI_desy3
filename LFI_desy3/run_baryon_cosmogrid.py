@@ -357,7 +357,7 @@ def make_maps(seed):
     overdensity_array = [np.zeros(hp.nside2npix(config['nside_intermediate']))]
 
 
-    path_ = base+'/gg_{0}_{1}.fits'.format(len(z_bounds['z-high'])-1,config['nside_out'])
+    path_ = base+'/ggA_{0}_{1}.fits'.format(len(z_bounds['z-high'])-1,config['nside_out'])
     if not os.path.exists(path_):
 
         #print ('load lens')
@@ -392,11 +392,11 @@ def make_maps(seed):
         # make g1 and g2 ---
         for i in frogress.bar(range(kappa_lensing.shape[0])):
             path_ = base+'/gg_{0}_{1}.fits'.format(i,config['nside_out'])
-            try:
-                 os.remove(path_)
-            except:
-                pass
-
+            #try:
+            #     os.remove(path_)
+            #except:
+            #    pass
+#
             if not os.path.exists(path_):
 
                 g1_, g2_ = gk_inv(kappa_lensing[i]-np.mean(kappa_lensing[i]),kappa_lensing[i]*0.,config['nside_intermediate'],config['nside_intermediate']*2)
@@ -446,7 +446,19 @@ def make_maps(seed):
     path_ = base_b+'/gg_{0}_{1}.fits'.format(len(z_bounds['z-high'])-1,config['nside_out'])
 
     
-    
+    # SAVE LENS MAPS  *****************************************************************
+    for s_ in frogress.bar(range(len(z_bounds['z-high']))):
+        path_ = base_b+'/lens_{0}_{1}.fits'.format(s_,config['nside_out'])
+        if not os.path.exists(path_):
+            shell_ = shell['shells'][i_sprt[s_]]
+            shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
+            shell_ = hp.ud_grade(shell_, nside_out = config['nside_out'])
+
+            fits_f = Table()
+            fits_f['T'] = shell_
+            if os.path.exists(path_):
+                os.remove(path_)
+            fits_f.write(path_)
     if not os.path.exists(path_):
         # SAVE LENS MAPS  *****************************************************************
         for s_ in (range(len(z_bounds['z-high']))):
@@ -559,7 +571,7 @@ def make_maps(seed):
                 fits_f['g2_IA'] = hp.ud_grade(g2_IA,nside_out =config['nside_out'])
 
                 fits_f.write(path_)
-                path_ = base_b+'/lens_{0}_{1}.fits'.format(i,config['nside_out'])
+                path_ = base_b+'/lens_{0}_{1}.fits'.format(i,config['nside_intermediate'])
                 os.system('rm {0}'.format(path_))
                 
                 
@@ -661,99 +673,7 @@ def make_maps(seed):
  
     sources_maps = dict()
     for tomo_bin in config['sources_bins']:   
-        if noise_type == 'random_depth':
-            depth_weigth = np.load('/global/cfs/cdirs/des/mass_maps/Maps_final/depth_maps_Y3_{0}_numbdensity.npy'.format(nside_out),allow_pickle=True).item()
             mcal_catalog = load_obj('/global/cfs/cdirs/des/mass_maps/Maps_final/data_catalogs_weighted_{0}'.format(tomo_bin-1))
-
-
-            pix_ = convert_to_pix_coord(mcal_catalog['ra'], mcal_catalog['dec'], nside=nside_out)
-            
-            dp_ = copy.deepcopy(depth_weigth[tomo_bin-1])
-            if rot ==1:
-                dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 180 ,0 , 0], flip=False,nside =nside_out )
-                rot_angles = [180, 0, 0]
-                flip=False
-                rotU = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
-                rot_alpha, rot_delta = rotU(alpha, delta)
-                if not flip:
-                    rot_i = hp.ang2pix(512, rot_alpha, rot_delta)
-                else:
-                    rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
-                pix_ = rot_i[pix_]
-            if rot ==2:
-                dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 90 ,0 , 0], flip=True,nside = nside_out )
-
-                rot_angles = [90, 0, 0]
-                flip=True
-                rotU = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
-                rot_alpha, rot_delta = rotU(alpha, delta)
-                if not flip:
-                    rot_i = hp.ang2pix(512, rot_alpha, rot_delta)
-                else:
-                    rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
-                pix_ = rot_i[pix_]
-            if rot ==3:
-                dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 270 ,0 , 0], flip=True,nside = nside_out)
-
-                rot_angles = [270, 0, 0]
-                flip=True
-                rotU = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                alpha, delta = hp.pix2ang(512, np.arange(hp.nside2npix(512)))
-                rot_alpha, rot_delta = rotU(alpha, delta)
-                if not flip:
-                    rot_i = hp.ang2pix(512, rot_alpha, rot_delta)
-                else:
-                    rot_i = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
-                pix_ = rot_i[pix_]     
-                    
-                    
-            mask = np.in1d(np.arange(hp.nside2npix(nside_out)),pix_)
-
-
-     
-           # The following bit samples galaxies from the <n> map we just loaded; then , it associates weights equal to the weight of one
-       # of the catalogue galaxies in the same pixel . Last, it associates ellipticities based on w-ellipticity relation learned from the catalog
-
-           
-            df2 = pd.DataFrame(data = {'w':mcal_catalog['w'] ,'pix_':pix_},index = pix_)
-            nn = np.random.poisson(dp_)
-            nn[~mask]= 0
-
-
-            count = 0
-
-            nnmaxx = max(nn)
-
-            for count in range(nnmaxx):
-                if count %2 ==0:
-                    df3 = df2.sample(frac=1)
-                    df4 = df3.drop_duplicates('pix_',keep ='first').sort_index()
-                else:
-                    df4 = df3.drop_duplicates('pix_',keep ='last').sort_index()
-
-                pix_valid = np.arange(len(nn))[nn>0]
-                df3 = df4.loc[np.unique(pix_valid)]
-                if count == 0:
-                    w = df3['w']
-                    pix = df3['pix_']
-                else:
-                    w = np.hstack([w,df3['w']])
-                    pix = np.hstack([pix,df3['pix_']]) 
-                nn -= 1
-
-            del df2
-            del df3
-            gc.collect()
-            e1,e2 = random_draw_ell_from_w(w,mcal_catalog['w'],mcal_catalog['e1'],mcal_catalog['e2'])
-            del mcal_catalog
-            gc.collect()
-
-        
-        elif noise_type == 'desy3':
-   
-            mcal_catalog = load_obj('/global/cfs/cdirs/des/mass_maps/Maps_final/data_catalogs_weighted_{0}'.format(tomo_bin))
             dec1 = mcal_catalog['dec']
             ra1 = mcal_catalog['ra']
             e1 = mcal_catalog['e1']
@@ -762,47 +682,49 @@ def make_maps(seed):
             pix_ = convert_to_pix_coord(ra1,dec1, nside=nside_out)
             
             if rot ==0:
-                pix = copy.deepcopy(pix_)
-                
+                rot_angles = [0, 0, 0]
+                flip=False
+                rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                alpha, delta = hp.pix2ang(config['nside_out'],pix_)
+                rot_alpha, rot_delta = rotu(alpha, delta)
+                if not flip:
+                    pix = hp.ang2pix(config['nside_out'], rot_alpha, rot_delta)
+                else:
+                    pix = hp.ang2pix(config['nside_out'], np.pi-rot_alpha, rot_delta)
+
             if rot ==1:
-                dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 180 ,0 , 0], flip=False,nside =nside_out )
                 rot_angles = [180, 0, 0]
                 flip=False
-                rot = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                alpha, delta = hp.pix2ang(512, pix_)
-                rot_alpha, rot_delta = rot(alpha, delta)
+                rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                alpha, delta = hp.pix2ang(config['nside_out'],pix_)
+                rot_alpha, rot_delta = rotu(alpha, delta)
                 if not flip:
-                    pix = hp.ang2pix(512, rot_alpha, rot_delta)
+                    pix = hp.ang2pix(config['nside_out'], rot_alpha, rot_delta)
                 else:
-                    pix = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
-              
-         
-            if rot ==2:
-                dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 90 ,0 , 0], flip=True,nside = nside_out )
+                    pix = hp.ang2pix(config['nside_out'], np.pi-rot_alpha, rot_delta)
 
+            if rot ==2:
                 rot_angles = [90, 0, 0]
                 flip=True
-                rot = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                alpha, delta = hp.pix2ang(512, pix_)
-                rot_alpha, rot_delta = rot(alpha, delta)
+                rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                alpha, delta = hp.pix2ang(config['nside_out'],pix_)
+                rot_alpha, rot_delta = rotu(alpha, delta)
                 if not flip:
-                    pix = hp.ang2pix(512, rot_alpha, rot_delta)
+                    pix = hp.ang2pix(config['nside_out'], rot_alpha, rot_delta)
                 else:
-                    pix = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
-        
-            if rot ==3:
-                dp_ = rotate_map_approx(depth_weigth[tomo_bin-1],[ 270 ,0 , 0], flip=True,nside = nside_out)
+                    pix = hp.ang2pix(config['nside_out'], np.pi-rot_alpha, rot_delta)
 
+            if rot ==3:
                 rot_angles = [270, 0, 0]
                 flip=True
-                rot = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                alpha, delta = hp.pix2ang(512, pix_)
-                rot_alpha, rot_delta = rot(alpha, delta)
+                rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                alpha, delta = hp.pix2ang(config['nside_out'],pix_)
+                rot_alpha, rot_delta = rotu(alpha, delta)
                 if not flip:
-                    pix = hp.ang2pix(512, rot_alpha, rot_delta)
+                    pix = hp.ang2pix(config['nside_out'], rot_alpha, rot_delta)
                 else:
-                    pix = hp.ang2pix(512, np.pi-rot_alpha, rot_delta)
-                
+                    pix = hp.ang2pix(config['nside_out'], np.pi-rot_alpha, rot_delta)
+
             
             del mcal_catalog
             gc.collect() 
@@ -991,7 +913,7 @@ if __name__ == '__main__':
 
 
 
-        for i in range(rot_num):
+        for i in range(0,rot_num):
 
             for nn in range(noise_rels):
 
