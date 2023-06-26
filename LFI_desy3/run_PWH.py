@@ -234,7 +234,7 @@ if __name__ == '__main__':
     for f in f_:
         target = f.split('/global/cfs/cdirs/des/mgatti/Dirac_mocks/')[1].split('.npy')[0]
         if not os.path.exists(output+target+'_rel3.pkl'):
-            if ('_noiserel6' in target) or ('_noiserel7' in target) or ('_noiserel8' in target):
+
         
                 runstodo.append(f)
         else:
