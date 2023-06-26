@@ -11,7 +11,7 @@ config['nside'] = 512
 # Function to process the data
 def doit(ii, ell_eff, weight_map):
     cat = np.load(files[ii], allow_pickle=True).item()
-    name = files[ii].split('/pscratch/sd/m/mgatti/Dirac/')[1].split('.npy')[0]
+    name = files[ii].split('/global/cfs/cdirs/des/mgatti/Dirac_mocks/')[1].split('.npy')[0]
 
     for rel in range(4):
         path = root + name + '_rel{0}.npy'.format(rel)
@@ -58,8 +58,8 @@ def doit(ii, ell_eff, weight_map):
             np.save(root + name + '_rel{0}'.format(rel), cls_)
 
 if __name__ == '__main__':
-    root = '/pscratch/sd/m/mgatti/pseudo_cl_new8/'
-    files_ = glob.glob('/pscratch/sd/m/mgatti/Dirac/*')
+    root = '/global/cfs/cdirs/des/mgatti/Dirac/LFI_dv/cl/'
+    files_ = glob.glob('/global/cfs/cdirs/des/mgatti/Dirac_mocks/*')
 
     # Load weight maps
     weight_map = np.load('/global/cfs/cdirs/des/mass_maps/Maps_final/weight_maps.npy', allow_pickle=True).item()
@@ -81,7 +81,7 @@ if __name__ == '__main__':
     nn = 0
     for file in files_:
         if ('_noiserel100' in file) or ('_noiserel101' in file) or ('_noiserel102' in file):
-            name = file.split('/pscratch/sd/m/mgatti/Dirac/')[1].split('.npy')[0]
+            name = file.split('/global/cfs/cdirs/des/mgatti/Dirac_mocks/')[1].split('.npy')[0]
             xx = root + name + '_rel{0}.npy'.format(3)
             if os.path.exists(xx):
                 count += 1
