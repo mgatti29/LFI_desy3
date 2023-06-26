@@ -673,62 +673,62 @@ def make_maps(seed):
  
     sources_maps = dict()
     for tomo_bin in config['sources_bins']:   
-            mcal_catalog = load_obj('/global/cfs/cdirs/des/mass_maps/Maps_final/data_catalogs_weighted_{0}'.format(tomo_bin-1))
-            dec1 = mcal_catalog['dec']
-            ra1 = mcal_catalog['ra']
-            e1 = mcal_catalog['e1']
-            e2 = mcal_catalog['e2']
-            w = mcal_catalog['w'] 
-            pix_ = convert_to_pix_coord(ra1,dec1, nside=nside_out)
-            
-            if rot ==0:
-                rot_angles = [0, 0, 0]
-                flip=False
-                rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                alpha, delta = hp.pix2ang(config['nside_out'],pix_)
-                rot_alpha, rot_delta = rotu(alpha, delta)
-                if not flip:
-                    pix = hp.ang2pix(config['nside_out'], rot_alpha, rot_delta)
-                else:
-                    pix = hp.ang2pix(config['nside_out'], np.pi-rot_alpha, rot_delta)
+        mcal_catalog = load_obj('/global/cfs/cdirs/des/mass_maps/Maps_final/data_catalogs_weighted_{0}'.format(tomo_bin-1))
+        dec1 = mcal_catalog['dec']
+        ra1 = mcal_catalog['ra']
+        e1 = mcal_catalog['e1']
+        e2 = mcal_catalog['e2']
+        w = mcal_catalog['w'] 
+        pix_ = convert_to_pix_coord(ra1,dec1, nside=nside_out)
 
-            if rot ==1:
-                rot_angles = [180, 0, 0]
-                flip=False
-                rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                alpha, delta = hp.pix2ang(config['nside_out'],pix_)
-                rot_alpha, rot_delta = rotu(alpha, delta)
-                if not flip:
-                    pix = hp.ang2pix(config['nside_out'], rot_alpha, rot_delta)
-                else:
-                    pix = hp.ang2pix(config['nside_out'], np.pi-rot_alpha, rot_delta)
+        if rot ==0:
+            rot_angles = [0, 0, 0]
+            flip=False
+            rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+            alpha, delta = hp.pix2ang(config['nside_out'],pix_)
+            rot_alpha, rot_delta = rotu(alpha, delta)
+            if not flip:
+                pix = hp.ang2pix(config['nside_out'], rot_alpha, rot_delta)
+            else:
+                pix = hp.ang2pix(config['nside_out'], np.pi-rot_alpha, rot_delta)
 
-            if rot ==2:
-                rot_angles = [90, 0, 0]
-                flip=True
-                rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                alpha, delta = hp.pix2ang(config['nside_out'],pix_)
-                rot_alpha, rot_delta = rotu(alpha, delta)
-                if not flip:
-                    pix = hp.ang2pix(config['nside_out'], rot_alpha, rot_delta)
-                else:
-                    pix = hp.ang2pix(config['nside_out'], np.pi-rot_alpha, rot_delta)
+        if rot ==1:
+            rot_angles = [180, 0, 0]
+            flip=False
+            rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+            alpha, delta = hp.pix2ang(config['nside_out'],pix_)
+            rot_alpha, rot_delta = rotu(alpha, delta)
+            if not flip:
+                pix = hp.ang2pix(config['nside_out'], rot_alpha, rot_delta)
+            else:
+                pix = hp.ang2pix(config['nside_out'], np.pi-rot_alpha, rot_delta)
 
-            if rot ==3:
-                rot_angles = [270, 0, 0]
-                flip=True
-                rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
-                alpha, delta = hp.pix2ang(config['nside_out'],pix_)
-                rot_alpha, rot_delta = rotu(alpha, delta)
-                if not flip:
-                    pix = hp.ang2pix(config['nside_out'], rot_alpha, rot_delta)
-                else:
-                    pix = hp.ang2pix(config['nside_out'], np.pi-rot_alpha, rot_delta)
+        if rot ==2:
+            rot_angles = [90, 0, 0]
+            flip=True
+            rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+            alpha, delta = hp.pix2ang(config['nside_out'],pix_)
+            rot_alpha, rot_delta = rotu(alpha, delta)
+            if not flip:
+                pix = hp.ang2pix(config['nside_out'], rot_alpha, rot_delta)
+            else:
+                pix = hp.ang2pix(config['nside_out'], np.pi-rot_alpha, rot_delta)
 
-            
-            del mcal_catalog
-            gc.collect() 
-            
+        if rot ==3:
+            rot_angles = [270, 0, 0]
+            flip=True
+            rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+            alpha, delta = hp.pix2ang(config['nside_out'],pix_)
+            rot_alpha, rot_delta = rotu(alpha, delta)
+            if not flip:
+                pix = hp.ang2pix(config['nside_out'], rot_alpha, rot_delta)
+            else:
+                pix = hp.ang2pix(config['nside_out'], np.pi-rot_alpha, rot_delta)
+
+
+        del mcal_catalog
+        gc.collect() 
+
             
                 
             
@@ -913,7 +913,7 @@ if __name__ == '__main__':
 
 
 
-        for i in range(0,rot_num):
+        for i in range(3,rot_num):
 
             for nn in range(noise_rels):
 
