@@ -80,7 +80,7 @@ if __name__ == '__main__':
     count = 0
     nn = 0
     for file in files_:
-        if ('_noiserel100' in file) or ('_noiserel101' in file) or ('_noiserel102' in file):
+
             name = file.split('/global/cfs/cdirs/des/mgatti/Dirac_mocks/')[1].split('.npy')[0]
             xx = root + name + '_rel{0}.npy'.format(3)
             if os.path.exists(xx):
