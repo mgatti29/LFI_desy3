@@ -673,6 +673,9 @@ def make_maps(seed):
  
     sources_maps = dict()
     for tomo_bin in config['sources_bins']:   
+        m_ = 1.+config['m_sources'][tomo_bin-1]
+
+        
         mcal_catalog = load_obj('/global/cfs/cdirs/des/mass_maps/Maps_final/data_catalogs_weighted_{0}'.format(tomo_bin-1))
         dec1 = mcal_catalog['dec']
         ra1 = mcal_catalog['ra']
@@ -735,8 +738,8 @@ def make_maps(seed):
         unique_pix, idx, idx_rep = np.unique(pix, return_index=True, return_inverse=True)
 
         # let us sample the noiseless shear maps at the galaxy location
-        g1_ = g1_tomo[tomo_bin][pix]
-        g2_ = g2_tomo[tomo_bin][pix]
+        g1_ = g1_tomo[tomo_bin][pix]*m_
+        g2_ = g2_tomo[tomo_bin][pix]*m_
             
         # SC correction factor
         if SC:
@@ -748,39 +751,66 @@ def make_maps(seed):
         sources_maps[tomo_bin] = dict()
 
         n_map_sc = np.zeros(hp.nside2npix(nside_out))
+        n_map = np.zeros(hp.nside2npix(nside_out))
         n_map_sc[unique_pix] += np.bincount(idx_rep, weights=w/f**2)
+        n_map[unique_pix] += np.bincount(idx_rep, weights=w)
 
 
 
         es1,es2 = apply_random_rotation(e1/f, e2/f)
         es1a,es2a = apply_random_rotation(e1/f, e2/f)
+        es1a0,es2a0 = apply_random_rotation(e1, e2)
 
-        x1_sc,x2_sc = addSourceEllipticity({'shear1':g1_,'shear2':g2_},{'e1':es1,'e2':es2},es_colnames=("e1","e2"))
+        #x1_sc,x2_sc = addSourceEllipticity({'shear1':g1_,'shear2':g2_},{'e1':es1,'e2':es2},es_colnames=("e1","e2"))
 
+        g1_map = np.zeros(hp.nside2npix(nside_out))
+        g2_map = np.zeros(hp.nside2npix(nside_out))
         e1_map = np.zeros(hp.nside2npix(nside_out))
         e2_map = np.zeros(hp.nside2npix(nside_out))
         e1r_map = np.zeros(hp.nside2npix(nside_out))
         e2r_map = np.zeros(hp.nside2npix(nside_out))
+        e1r_map0 = np.zeros(hp.nside2npix(nside_out))
+        e2r_map0 = np.zeros(hp.nside2npix(nside_out))
 
-
-        e1_map[unique_pix] += np.bincount(idx_rep, weights= x1_sc*w)
-        e2_map[unique_pix] += np.bincount(idx_rep, weights= x2_sc*w)
+        # signal
+        g1_map[unique_pix] += np.bincount(idx_rep, weights= g1_*w)
+        g2_map[unique_pix] += np.bincount(idx_rep, weights= g2_*w)
+        #noise1
+        e1_map[unique_pix] += np.bincount(idx_rep, weights= es1*w)
+        e2_map[unique_pix] += np.bincount(idx_rep, weights= es2*w)
+        #noise 2
         e1r_map[unique_pix] += np.bincount(idx_rep, weights=es1a*w)
         e2r_map[unique_pix] += np.bincount(idx_rep, weights=es2a*w)
+        # noise no sc
+        e1r_map0[unique_pix] += np.bincount(idx_rep, weights=es1a0*w)
+        e2r_map0[unique_pix] += np.bincount(idx_rep, weights=es2a0*w)
 
+        
         mask_sims = n_map_sc != 0.
+        g1_map[mask_sims]  = g1_map[mask_sims]/(n_map_sc[mask_sims])
+        g2_map[mask_sims] =  g2_map[mask_sims]/(n_map_sc[mask_sims])
         e1_map[mask_sims]  = e1_map[mask_sims]/(n_map_sc[mask_sims])
         e2_map[mask_sims] =  e2_map[mask_sims]/(n_map_sc[mask_sims])
         e1r_map[mask_sims]  = e1r_map[mask_sims]/(n_map_sc[mask_sims])
         e2r_map[mask_sims] =  e2r_map[mask_sims]/(n_map_sc[mask_sims])
+        e1r_map0[mask_sims]  = e1r_map0[mask_sims]/(n_map[mask_sims])
+        e2r_map0[mask_sims] =  e2r_map0[mask_sims]/(n_map[mask_sims])
+
+        var_ =  e1r_map0**2+e2r_map0**2
 
 
+                    #'''
+        e1_map   *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+        e2_map   *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+        e1r_map *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+        e2r_map *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+        
 
-        m_ = 1.+config['m_sources'][tomo_bin-1]
 
+        
 
-        print ( m_,tomo_bin)
-        sources_maps[tomo_bin]  = {'e1':m_*e1_map,'e2':m_*e2_map,'e1r':m_*e1r_map,'e2r':m_*e2r_map} 
+  
+        sources_maps[tomo_bin]  = {'e1':g1_map+e1_map,'e2':g2_map+e2_map,'e1r':e1r_map,'e2r':e2r_map} 
 
         
 
@@ -788,8 +818,8 @@ def make_maps(seed):
         
         
         # let us sample the noiseless shear maps at the galaxy location
-        g1_ = g1_tomo_b[tomo_bin][pix]
-        g2_ = g2_tomo_b[tomo_bin][pix]
+        g1_ = g1_tomo_b[tomo_bin][pix]*m_
+        g2_ = g2_tomo_b[tomo_bin][pix]*m_
             
         # SC correction factor
         if SC:
@@ -803,25 +833,24 @@ def make_maps(seed):
         n_map_sc[unique_pix] += np.bincount(idx_rep, weights=w/f**2)
 
 
-        x1_sc,x2_sc = addSourceEllipticity({'shear1':g1_,'shear2':g2_},{'e1':es1,'e2':es2},es_colnames=("e1","e2"))
+        #x1_sc,x2_sc = addSourceEllipticity({'shear1':g1_,'shear2':g2_},{'e1':es1,'e2':es2},es_colnames=("e1","e2"))
 
-        e1_map = np.zeros(hp.nside2npix(nside_out))
-        e2_map = np.zeros(hp.nside2npix(nside_out))
-        e1r_map = np.zeros(hp.nside2npix(nside_out))
-        e2r_map = np.zeros(hp.nside2npix(nside_out))
+        g1_map = np.zeros(hp.nside2npix(nside_out))
+        g2_map = np.zeros(hp.nside2npix(nside_out))
 
 
-        e1_map[unique_pix] += np.bincount(idx_rep, weights= x1_sc*w)
-        e2_map[unique_pix] += np.bincount(idx_rep, weights= x2_sc*w)
+
+        g1_map[unique_pix] += np.bincount(idx_rep, weights= g1_*w)
+        g2_map[unique_pix] += np.bincount(idx_rep, weights= g2_*w)
 
         mask_sims = n_map_sc != 0.
-        e1_map[mask_sims]  = e1_map[mask_sims]/(n_map_sc[mask_sims])
-        e2_map[mask_sims] =  e2_map[mask_sims]/(n_map_sc[mask_sims])
+        g1_map[mask_sims]  = g1_map[mask_sims]/(n_map_sc[mask_sims])
+        g2_map[mask_sims] =  g2_map[mask_sims]/(n_map_sc[mask_sims])
 
 
 
-        sources_maps[tomo_bin]['e1b'] = m_*e1_map
-        sources_maps[tomo_bin]['e2b'] = m_*e2_map
+        sources_maps[tomo_bin]['e1b'] = g1_map+e1_map
+        sources_maps[tomo_bin]['e2b'] = g2_map+e2_map
         
 
     # save output 
@@ -832,14 +861,16 @@ def make_maps(seed):
 
 #salloc --nodes 4 --qos interactive --time 04:00:00 --constraint cpu --account=des
 
+corr = [1.0608,1.0295,1.0188,1.0115]
+coeff_kurtosis = [0.1,0.05,0.036,0.036]
 
 
 # some config
 nside = 512 #nside cosmogrid particle count maps
 nside_out = 512 #nside final noisy maps
 SC = True #apply SC or not
-noise_rels = 10 # number of noise realisations considered
-rot_num = 4 # number of rotations considered (max 4)
+noise_rels = 1 # number of noise realisations considered
+rot_num = 1 # number of rotations considered (max 4)
 A_IA = 0.0
 e_IA = 0.0
 runs_cosmo = 7 # number of cosmogrid independent maps
@@ -886,7 +917,7 @@ if __name__ == '__main__':
 
 
 
-    for f in range(runs_cosmo):
+    for f in range(0,runs_cosmo):
 
         if not os.path.exists(output_intermediate_maps+'/meta_{0}/'.format(f)):
             try:
@@ -913,7 +944,7 @@ if __name__ == '__main__':
 
 
 
-        for i in range(3,rot_num):
+        for i in range(0,rot_num):
 
             for nn in range(noise_rels):
 
@@ -961,8 +992,8 @@ if __name__ == '__main__':
 
     print (len(runstodo),count,miss)
 
-    make_maps(runstodo[0])
-    '''
+   # make_maps(runstodo[0])
+    #'''
     run_count=0
     
     from mpi4py import MPI
@@ -979,7 +1010,7 @@ if __name__ == '__main__':
         run_count+=comm.size
         comm.bcast(run_count,root = 0)
         comm.Barrier()
-    '''     
+   # '''     
 
    # while run_count<len(runstodo):
    #     
