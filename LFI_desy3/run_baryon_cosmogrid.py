@@ -275,8 +275,9 @@ def make_maps(seed):
     shell_ = hp.ud_grade(shell_,nside_out=config['nside_intermediate'])
     '''
     #
-    shell = np.load(path_sims+'/run_{0}//shells_nside=512.npz'.format(config['f']))
-    shell = np.load(path_sims+'/run_{0}//compressed_shells.npz'.format(config['f']))
+    
+    #shell = np.load(path_sims+'/run_{0}//shells_nside=512.npz'.format(config['f']))
+    shell = np.load(path_sims+'/run_{0}//compressed_shells.npz'.format(config['f'])) #2048
 
 
     from ekit import paths as path_tools
@@ -306,39 +307,21 @@ def make_maps(seed):
                 os.remove(path_)
             fits_f.write(path_)
                 
-    path_ = base+'/gg_{0}_{1}.fits'.format(len(z_bounds['z-high'])-1,config['nside_out'])
-    if not os.path.exists(path_):
-        # SAVE LENS MAPS  *****************************************************************
-        for s_ in frogress.bar(range(len(z_bounds['z-high']))):
-            path_ = base+'/lens_{0}_{1}.fits'.format(s_,config['nside_out'])
-            if not os.path.exists(path_):
-                shell_ = shell['shells'][i_sprt[s_]]
-                shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
-                shell_ = hp.ud_grade(shell_, nside_out = config['nside_out'])
+    for s_ in frogress.bar(range(len(z_bounds['z-high']))):
+        path_ = base+'/lens_{0}_{1}.fits'.format(s_,config['nside_intermediate'])
+        if not os.path.exists(path_):
+            shell_ = shell['shells'][i_sprt[s_]]
+            shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
+            shell_ = hp.ud_grade(shell_, nside_out = config['nside_intermediate'])
 
-                fits_f = Table()
-                fits_f['T'] = shell_
-                if os.path.exists(path_):
-                    os.remove(path_)
-                fits_f.write(path_)
-
-
-
-            path_ = base+'/lens_{0}_{1}.fits'.format(s_,config['nside_intermediate'])
-            if not os.path.exists(path_):
-                shell_ = shell['shells'][i_sprt[s_]]
-                shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
-                shell_ = hp.ud_grade(shell_, nside_out = config['nside_intermediate'])
-
-                fits_f = Table()
-                fits_f['T'] = shell_
-                if os.path.exists(path_):
-                    os.remove(path_)
-                fits_f.write(path_)
-
+            fits_f = Table()
+            fits_f['T'] = shell_
+            if os.path.exists(path_):
+                os.remove(path_)
+            fits_f.write(path_)
 
                 
-                
+           
                 
     # SAVE CONVERGENCE PLANES ********************************************************
     kappa_pref_evaluated = brk.kappa_prefactor(cosmology.H0, cosmology.Om0, length_unit = 'Mpc')
@@ -353,11 +336,11 @@ def make_maps(seed):
     comoving_edges = np.array([c.value for c in comoving_edges])
     comoving_edges = comoving_edges*un_
 
-
+ 
     overdensity_array = [np.zeros(hp.nside2npix(config['nside_intermediate']))]
 
 
-    path_ = base+'/ggA_{0}_{1}.fits'.format(len(z_bounds['z-high'])-1,config['nside_out'])
+    path_ = base+'/gg_{0}_{1}.fits'.format(len(z_bounds['z-high'])-1,config['nside_out'])
     if not os.path.exists(path_):
 
         #print ('load lens')
@@ -413,12 +396,12 @@ def make_maps(seed):
 
                 fits_f.write(path_)
                 path_ = base+'/lens_{0}_{1}.fits'.format(i,config['nside_intermediate'])
-                os.system('rm {0}'.format(path_))
+                #os.system('rm {0}'.format(path_))
 
 
 
 
-
+   
 
 
 
@@ -445,7 +428,7 @@ def make_maps(seed):
     z_bin_edges = np.hstack([z_bounds['z-low'],z_bounds['z-high'][-1]])
     path_ = base_b+'/gg_{0}_{1}.fits'.format(len(z_bounds['z-high'])-1,config['nside_out'])
 
-    
+
     # SAVE LENS MAPS  *****************************************************************
     for s_ in frogress.bar(range(len(z_bounds['z-high']))):
         path_ = base_b+'/lens_{0}_{1}.fits'.format(s_,config['nside_out'])
@@ -456,37 +439,19 @@ def make_maps(seed):
 
             fits_f = Table()
             fits_f['T'] = shell_
-            if os.path.exists(path_):
-                os.remove(path_)
             fits_f.write(path_)
-    if not os.path.exists(path_):
-        # SAVE LENS MAPS  *****************************************************************
-        for s_ in (range(len(z_bounds['z-high']))):
-            path_ = base_b+'/lens_{0}_{1}.fits'.format(s_,config['nside_out'])
-            if not os.path.exists(path_):
-                shell_ = shell['shells'][i_sprt[s_]]
-                shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
-                shell_ = hp.ud_grade(shell_, nside_out = config['nside_out'])
+            
+    for s_ in frogress.bar(range(len(z_bounds['z-high']))):
+        path_ = base_b+'/lens_{0}_{1}.fits'.format(s_,config['nside_intermediate'])
+        if not os.path.exists(path_):
+            shell_ = shell['shells'][i_sprt[s_]]
+            shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
+            shell_ = hp.ud_grade(shell_, nside_out = config['nside_intermediate'])
 
-                fits_f = Table()
-                fits_f['T'] = shell_
-                if os.path.exists(path_):
-                    os.remove(path_)
-                fits_f.write(path_)
-
-
-
-            path_ = base_b+'/lens_{0}_{1}.fits'.format(s_,config['nside_intermediate'])
-            if not os.path.exists(path_):
-                shell_ = shell['shells'][i_sprt[s_]]
-                shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
-                shell_ = hp.ud_grade(shell_, nside_out = config['nside_intermediate'])
-
-                fits_f = Table()
-                fits_f['T'] = shell_
-                if os.path.exists(path_):
-                    os.remove(path_)
-                fits_f.write(path_)
+            fits_f = Table()
+            fits_f['T'] = shell_
+            fits_f.write(path_)
+            
 
 
 
@@ -571,10 +536,9 @@ def make_maps(seed):
                 fits_f['g2_IA'] = hp.ud_grade(g2_IA,nside_out =config['nside_out'])
 
                 fits_f.write(path_)
-                path_ = base_b+'/lens_{0}_{1}.fits'.format(i,config['nside_intermediate'])
-                os.system('rm {0}'.format(path_))
+
                 
-                
+     
 
     # read n(z) ********************
     mu = pf.open(config['2PT_FILE'])
@@ -647,7 +611,7 @@ def make_maps(seed):
             IA_f = iaa.F_nla(z_centre[i], cosmology.Om0, rho_c1=rho_c1,A_ia = config['A_IA'], eta=config['eta_IA'], z0=config['z0_IA'],  lbar=0., l0=1e-9, beta=0.)
             #print ((k_[1].data['T']))
             for tomo_bin in config['sources_bins']:         
-                m_ = 1.+config['m_sources'][tomo_bin-1]
+
                 b = 1.#extra_params['db'][tomo_bin]
                 if SC:
                     g1_tomo_b[tomo_bin]  +=  ((1.+(b*d_[1].data['T']))*(k_[1].data['g1']+k_[1].data['g1_IA']*IA_f))*nz_kernel_sample_dict[tomo_bin][i]
@@ -869,11 +833,11 @@ coeff_kurtosis = [0.1,0.05,0.036,0.036]
 nside = 512 #nside cosmogrid particle count maps
 nside_out = 512 #nside final noisy maps
 SC = True #apply SC or not
-noise_rels = 1 # number of noise realisations considered
-rot_num = 1 # number of rotations considered (max 4)
+noise_rels = 10 #0 # number of noise realisations considered
+rot_num = 4 # number of rotations considered (max 4)
 A_IA = 0.0
 e_IA = 0.0
-runs_cosmo = 7 # number of cosmogrid independent maps
+runs_cosmo = 10 #7 # number of cosmogrid independent maps
 noise_type = 'desy3' # or 'random_depth'
 
 
@@ -883,19 +847,22 @@ noise_type = 'desy3' # or 'random_depth'
 #path_sims = '/global/cfs/cdirs/des/cosmogrid/raw/fiducial/cosmo_delta_Om_p/'
 #path_sims = '/global/cfs/cdirs/des/cosmogrid/raw/fiducial/cosmo_delta_Om_m/'
 #path_sims = '/global/cfs/cdirs/des/cosmogrid/raw/fiducial/cosmo_fiducial/' # this is the fiducal
-path_sims = '/global/cfs/cdirs/des/cosmogrid/raw/grid/cosmo_002846/'
 # this is the path to intermediate products like kappa g1 g2 maps (already run)
 # chose one among the ones below
 #output_intermediate_maps = '/global/cfs/cdirs/des/mgatti/cosmogrid/cosmo_delta_s8_m/'
 #output_intermediate_maps = '/global/cfs/cdirs/des/mgatti/cosmogrid/cosmo_delta_s8_p/'
 #output_intermediate_maps = '/global/cfs/cdirs/des/mgatti/cosmogrid/cosmo_delta_Om_p/'
 #output_intermediate_maps = '/global/cfs/cdirs/des/mgatti/cosmogrid/cosmo_delta_Om_m/'
+
+
+path_sims = '/global/cfs/cdirs/des/cosmogrid/raw/grid/cosmo_002846/'
 output_intermediate_maps = '/global/cfs/cdirs/des/mgatti/cosmogrid_002846_1024_3/' # this is the fiducial run
-
-
-# the final noisy maps will be saved here
-
 output_temp = '/global/cfs/cdirs/des/mgatti/cosmogrid/baryons_002846_final/'
+
+path_sims = '/global/cfs/cdirs/des/cosmogrid/raw/fiducial/cosmo_fiducial/'
+output_intermediate_maps = '/global/cfs/cdirs/des/mgatti/cosmogridfiducial_3/' # this is the fiducial run
+output_temp = '/global/cfs/cdirs/des/mgatti/cosmogrid/baryons_cosmogridfiducial_final/'
+
 
 if not os.path.exists(output_intermediate_maps):
     try:
@@ -966,10 +933,10 @@ if __name__ == '__main__':
                 params_dict['f'] = f
 
 
-                params_dict['m1'] =  -0.002
-                params_dict['m2'] = -0.017
-                params_dict['m3'] = -0.029
-                params_dict['m4'] = -0.038
+                params_dict['m1'] =  -0.002-0.01
+                params_dict['m2'] =  -0.017-0.01
+                params_dict['m3'] =  -0.029-0.01
+                params_dict['m4'] =  -0.038-0.01
 
                 params_dict['dz1'] = 0.
                 params_dict['dz2'] = 0.
@@ -992,7 +959,7 @@ if __name__ == '__main__':
 
     print (len(runstodo),count,miss)
 
-   # make_maps(runstodo[0])
+
     #'''
     run_count=0
     
@@ -1010,21 +977,21 @@ if __name__ == '__main__':
         run_count+=comm.size
         comm.bcast(run_count,root = 0)
         comm.Barrier()
-   # '''     
+    ##'''     
 
-   # while run_count<len(runstodo):
-   #     
+    #while run_count<len(runstodo):
+    #    
 ##
-   #     if (run_count)<len(runstodo):
-   #         #try:
-   #             make_maps(runstodo[run_count])
-   #        # except:
-   #        #     pass
-   #     #if (run_count)<len(runstodo):
-   #     #    make_maps(runstodo[run_count])
-   #     run_count+=1
-   #     #comm.bcast(run_count,root = 0)
-   #     #comm.Barrier()
-##srun --nodes=4 --tasks-per-node=7  python run_cosmogrid_baryons.py
+    #    if (run_count)<len(runstodo):
+    #        #try:
+    #            make_maps(runstodo[run_count])
+    #       # except:
+    #       #     pass
+    #    #if (run_count)<len(runstodo):
+    #    #    make_maps(runstodo[run_count])
+    #    run_count+=1
+    #    #comm.bcast(run_count,root = 0)
+    #    #comm.Barrier()
+##srun --nodes=4 --tasks-per-node=10  python run_cosmogrid_baryons.py
 ##srun --nodes=1 --tasks-per-node=4 --cpus-per-task=16 --cpu-bind=cores  python run_cosmogrid_baryons.py
 
