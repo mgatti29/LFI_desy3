@@ -435,23 +435,25 @@ def make_maps(seed):
         if not os.path.exists(path_):
             shell_ = shell['shells'][i_sprt[s_]]
             shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
+            
+            # alm2map map2alm?
             shell_ = hp.ud_grade(shell_, nside_out = config['nside_out'])
 
             fits_f = Table()
             fits_f['T'] = shell_
             fits_f.write(path_)
             
-    for s_ in frogress.bar(range(len(z_bounds['z-high']))):
-        path_ = base_b+'/lens_{0}_{1}.fits'.format(s_,config['nside_intermediate'])
-        if not os.path.exists(path_):
-            shell_ = shell['shells'][i_sprt[s_]]
-            shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
-            shell_ = hp.ud_grade(shell_, nside_out = config['nside_intermediate'])
-
-            fits_f = Table()
-            fits_f['T'] = shell_
-            fits_f.write(path_)
-            
+    #for s_ in frogress.bar(range(len(z_bounds['z-high']))):
+    #    path_ = base_b+'/lens_{0}_{1}.fits'.format(s_,config['nside_intermediate'])
+    #    if not os.path.exists(path_):
+    #        shell_ = shell['shells'][i_sprt[s_]]
+    #        shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
+    #        shell_ = hp.ud_grade(shell_, nside_out = config['nside_intermediate'])
+#
+    #        fits_f = Table()
+    #        fits_f['T'] = shell_
+    #        fits_f.write(path_)
+    #        
 
 
 
@@ -469,7 +471,8 @@ def make_maps(seed):
     comoving_edges = comoving_edges*un_
 
 
-    overdensity_array = [np.zeros(hp.nside2npix(config['nside_intermediate']))]
+    #overdensity_array = [np.zeros(hp.nside2npix(config['nside_intermediate']))]
+    overdensity_array = [np.zeros(hp.nside2npix(config['nside']))]
 
 
     path_ = base_b+'/gg_{0}_{1}.fits'.format(len(z_bounds['z-high'])-1,config['nside_out'])
@@ -480,12 +483,14 @@ def make_maps(seed):
         #print ('load lens')
         for s_ in (range(len(z_bounds['z-high']))):
             try:
-                path_ = base_b+'/lens_{0}_{1}.fits'.format(s_,config['nside_intermediate'])
+                #path_ = base_b+'/lens_{0}_{1}.fits'.format(s_,config['nside_intermediate'])
+                path_ = base_b+'/lens_{0}_{1}.fits'.format(s_,config['nside_out'])
                 m_ = pf.open(path_)
                 overdensity_array.append(m_[1].data['T'])
             except:
                 if shell !=0:
-                    overdensity_array.append(np.zeros(hp.nside2npix(config['nside_intermediate'])))
+                    #overdensity_array.append(np.zeros(hp.nside2npix(config['nside_intermediate'])))
+                    overdensity_array.append(np.zeros(hp.nside2npix(config['nside_out'])))
                 #pass
 
 
@@ -523,21 +528,34 @@ def make_maps(seed):
 
             if not os.path.exists(path_):
 
-                g1_, g2_ = gk_inv(kappa_lensing[i]-np.mean(kappa_lensing[i]),kappa_lensing[i]*0.,config['nside_intermediate'],config['nside_intermediate']*2)
-                g1_IA, g2_IA = gk_inv(overdensity_array[i]-np.mean(overdensity_array[i]),kappa_lensing[i]*0.,config['nside_intermediate'],config['nside_intermediate']*2)
+                #g1_, g2_ = gk_inv(kappa_lensing[i]-np.mean(kappa_lensing[i]),kappa_lensing[i]*0.,config['nside_intermediate'],config['nside_intermediate']*2)
+                #g1_IA, g2_IA = gk_inv(overdensity_array[i]-np.mean(overdensity_array[i]),kappa_lensing[i]*0.,config['nside_intermediate'],config['nside_intermediate']*2)
+#
+#
+                #fits_f = Table()
+                ##alm = hp.sphtfunc.map2alm(g1_)
+                ##g1_ = hp.sphtfunc.alm2map(alm,nside= config['nside_out'])
+                #fits_f['g1'] = hp.ud_grade(g1_,nside_out =config['nside_out'])
+                #fits_f['g2'] = hp.ud_grade(g2_,nside_out =config['nside_out'])
+                #fits_f['g1_IA'] = hp.ud_grade(g1_IA,nside_out =config['nside_out'])
+                #fits_f['g2_IA'] = hp.ud_grade(g2_IA,nside_out =config['nside_out'])
+#
+                #fits_f.write(path_)
+
+                g1_, g2_ = gk_inv(kappa_lensing[i]-np.mean(kappa_lensing[i]),kappa_lensing[i]*0.,config['nside_out'],config['nside_out']*2)
+                g1_IA, g2_IA = gk_inv(overdensity_array[i]-np.mean(overdensity_array[i]),kappa_lensing[i]*0.,config['nside_out'],config['nside_out']*2)
 
 
                 fits_f = Table()
                 #alm = hp.sphtfunc.map2alm(g1_)
                 #g1_ = hp.sphtfunc.alm2map(alm,nside= config['nside_out'])
-                fits_f['g1'] = hp.ud_grade(g1_,nside_out =config['nside_out'])
-                fits_f['g2'] = hp.ud_grade(g2_,nside_out =config['nside_out'])
-                fits_f['g1_IA'] = hp.ud_grade(g1_IA,nside_out =config['nside_out'])
-                fits_f['g2_IA'] = hp.ud_grade(g2_IA,nside_out =config['nside_out'])
+                fits_f['g1'] = g1_
+                fits_f['g2'] = g2_
+                fits_f['g1_IA'] = g1_IA
+                fits_f['g2_IA'] =g2_IA
 
                 fits_f.write(path_)
-
-                
+           
      
 
     # read n(z) ********************
@@ -933,10 +951,10 @@ if __name__ == '__main__':
                 params_dict['f'] = f
 
 
-                params_dict['m1'] =  -0.002-0.01
-                params_dict['m2'] =  -0.017-0.01
-                params_dict['m3'] =  -0.029-0.01
-                params_dict['m4'] =  -0.038-0.01
+                params_dict['m1'] =  -0.002
+                params_dict['m2'] =  -0.017
+                params_dict['m3'] =  -0.029
+                params_dict['m4'] =  -0.038
 
                 params_dict['dz1'] = 0.
                 params_dict['dz2'] = 0.
@@ -992,6 +1010,6 @@ if __name__ == '__main__':
     #    run_count+=1
     #    #comm.bcast(run_count,root = 0)
     #    #comm.Barrier()
-##srun --nodes=4 --tasks-per-node=10  python run_cosmogrid_baryons.py
+##srun --nodes=4 --tasks-per-node=64  python run_cosmogrid_baryons.py
 ##srun --nodes=1 --tasks-per-node=4 --cpus-per-task=16 --cpu-bind=cores  python run_cosmogrid_baryons.py
 
