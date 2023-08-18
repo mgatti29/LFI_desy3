@@ -173,14 +173,14 @@ def compute_phmoments(file,output=''):
             
             
            
-
                 mcal_moments.compute_moments('KK','k_sm_kE',field_label2='k_sm_kE', tomo_bins1 = [0,1,2,3], tomo_bins2 = [0,1,2,3])
                 mcal_moments.compute_moments('KN','k_sm_kE',field_label2='kn_sm_kE', tomo_bins1 = [0,1,2,3], tomo_bins2 = [0,1,2,3])
-                mcal_moments.compute_moments('NK','kn_sm_kE',field_label2='k_sm_kE', tomo_bins1 = [0,1,2,3], tomo_bins2 = [0,1,2,3])            
+                mcal_moments.compute_moments('NK','kn_sm_kE',field_label2='k_sm_kE', tomo_bins1 = [0,1,2,3], tomo_bins2 = [0,1,2,3])
                 mcal_moments.compute_moments('NN','kn_sm_kE',field_label2='kn_sm_kE', tomo_bins1 = [0,1,2,3], tomo_bins2 = [0,1,2,3])
                 mcal_moments.compute_moments('bKK', 'bk_sm_kE',field_label2='bk_sm_kE', tomo_bins1 = [0,1,2,3], tomo_bins2 = [0,1,2,3])
                 mcal_moments.compute_moments('bNN', 'bkn_sm_kE',field_label2='bkn_sm_kE', tomo_bins1 = [0,1,2,3], tomo_bins2 = [0,1,2,3])
-
+                
+                
 
                 del mcal_moments.smoothed_maps
                 del mcal_moments.fields
@@ -201,7 +201,8 @@ if __name__ == '__main__':
     files = glob.glob('/global/cfs/cdirs/des/mgatti/Dirac_mocks/*')
     f_= []
     for f in files:
-        if 'noiserel0' in f:
+        if ('512' in f) :
+               
             f_.append(f)
 
     runstodo = []
@@ -225,6 +226,7 @@ if __name__ == '__main__':
         comm = MPI.COMM_WORLD
 #
         if (run_count+comm.rank)<len(runstodo):
+            
             compute_phmoments(runstodo[run_count+comm.rank],output)
                 
         #if (run_count)<len(runstodo):
