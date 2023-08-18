@@ -206,6 +206,7 @@ def compute_phmoments(file,output=''):
                             
                 for i in t_:
           
+                    print (i)
                     s_mean = st_calc.scattering_coef(np.load(mcal_moments.fields_patches['k'][i]+'.npy',allow_pickle=True))
                     label = 'K'
                     mcal_moments.moments_ST[label][i]= dict()
@@ -261,6 +262,7 @@ def compute_phmoments(file,output=''):
                 #save_obj(output+'moments_'+target+'_rel{0}'.format(rel),[mcal_moments,params])
  
 #srun --nodes=4 --tasks-per-node=64   python run_ST.py 
+#srun --nodes=4 --tasks-per-node=16   python run_ST.py 
 
 
 if __name__ == '__main__':
@@ -279,10 +281,10 @@ if __name__ == '__main__':
             pass
 
     runstodo = []
-    count =0
+    count = 0
     for f in f_:
-        target = f.split('/global/cfs/cdirs/des/mgatti/Dirac_mocks/')[1].split('.npy')[0]
-        if ('_noiserel6' in f) or ('_noiserel7' in f) or ('_noiserel8' in f):
+            target = f.split('/global/cfs/cdirs/des/mgatti/Dirac_mocks/')[1].split('.npy')[0]
+        #if ('_noiserel6' in f) or ('_noiserel7' in f) or ('_noiserel8' in f):
         
             if not os.path.exists(output+target+'_rel3.pkl'):
                 # if ('noiserel31' in target) or ('noiserel32' in target):
@@ -305,11 +307,13 @@ if __name__ == '__main__':
         comm = MPI.COMM_WORLD
 #
         if (run_count+comm.rank)<len(runstodo):
-            compute_phmoments(runstodo[run_count+comm.rank],output)
-                
+            try:
+                compute_phmoments(runstodo[run_count+comm.rank],output)
+            except:
+                pass
         #if (run_count)<len(runstodo):
         #    make_maps(runstodo[run_count])
         run_count+=comm.size
         comm.bcast(run_count,root = 0)
         comm.Barrier() 
- 
+ #
