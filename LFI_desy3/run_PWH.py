@@ -85,7 +85,7 @@ def compute_phmoments(file,output=''):
                 print (f_)
 
 
-        for rel in range(3,4):
+        for rel in range(4):
             params = dict()
             params['om'] = om_[run-1]
             params['h'] = h_[run-1]
@@ -234,7 +234,7 @@ if __name__ == '__main__':
     for f in f_:
         target = f.split('/global/cfs/cdirs/des/mgatti/Dirac_mocks/')[1].split('.npy')[0]
         if not os.path.exists(output+target+'_rel3.pkl'):
-
+            #if ('_noiserel6' in target) or ('_noiserel7' in target) or ('_noiserel8' in target):
         
                 runstodo.append(f)
         else:
@@ -260,4 +260,4 @@ if __name__ == '__main__':
         run_count+=comm.size
         comm.bcast(run_count,root = 0)
         comm.Barrier() 
-##srun --nodes=4 --tasks-per-node=64   python run_PWH.py 
+##srun --nodes=1 --tasks-per-node=32   python run_PWH.py 
