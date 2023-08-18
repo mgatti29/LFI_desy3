@@ -242,10 +242,16 @@ if __name__ == '__main__':
 
 
 
-    
+
+
+    #try it once using these lines:
+    #run_count=0
+    #compute_phmoments(runstodo[run_count],output)
+
+    #
     print (len(runstodo),count)
     run_count=0
-    #compute_phmoments(runstodo[run_count],output)
+   
     from mpi4py import MPI 
     while run_count<len(runstodo):
         comm = MPI.COMM_WORLD
