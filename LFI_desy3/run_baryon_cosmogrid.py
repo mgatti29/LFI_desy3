@@ -362,8 +362,9 @@ def make_maps(seed):
         kappa_lensing = np.copy(overdensity_array)*0.
 
 
+
         for i in frogress.bar(np.arange(1,kappa_lensing.shape[0])):
-            #try:
+            try:
                 kappa_lensing[i-1] = lensing.raytrace(cosmology.H0, cosmology.Om0,
                                              overdensity_array=overdensity_array[1:(i+1)].T,
                                              a_centre=1./(1.+z_centre[:i]),
@@ -375,10 +376,20 @@ def make_maps(seed):
                 #                             comoving_edges=comoving_edges[:(i+1)])
                 #
                 
-            #except:
-            #    print ('failed kappa ',i)
+            except:
+                print ('failed kappa ',i)
                
-
+        for i in frogress.bar(np.arange(1,kappa_lensing.shape[0])):
+            
+            path_ = base+'/k_{0}_{1}.fits'.format(i,config['nside_intermediate'])
+            if not os.path.exists(path_):
+                fits_f = Table()
+            
+                fits_f['k'] = kappa_lensing[i]
+            
+                fits_f.write(path_)
+            
+                
         # make g1 and g2 ---
         for i in frogress.bar(range(kappa_lensing.shape[0])):
             path_ = base+'/gg_{0}_{1}.fits'.format(i,config['nside_out'])
@@ -574,9 +585,9 @@ def make_maps(seed):
     #random_rel = np.random.randint(0,6000,1)[0]
     random_rel = 0
     redshift_distributions_sources = {'z':None,'bins':dict()}
-    redshift_distributions_sources['z'] = mu[8+random_rel].data['Z_MID']
+    redshift_distributions_sources['z'] = mu[6].data['Z_MID']#mu[8+random_rel].data['Z_MID']
     for ix in config['sources_bins']:
-        redshift_distributions_sources['bins'][ix] = mu[8+random_rel].data['BIN{0}'.format(ix)]
+        redshift_distributions_sources['bins'][ix] =  mu[6].data['BIN{0}'.format(ix)]
     mu = None
 
     # prepare g1,g2 maps, interpolate n(z) at the shells location and apply redshift shifts
@@ -609,7 +620,7 @@ def make_maps(seed):
 
 
     # fill in g1,g1 maps
-    for i in (range(2,len(comoving_edges))):
+    for i in (range(2,len(comoving_edges)-1)):
 
             path_ = base+'/lens_{0}_{1}.fits'.format(i,config['nside_out'])
             pathgg_ = base+'/gg_{0}_{1}.fits'.format(i,config['nside_out'])
@@ -862,11 +873,11 @@ coeff_kurtosis = [0.1,0.05,0.036,0.036]
 nside = 512 #nside cosmogrid particle count maps
 nside_out = 512 #nside final noisy maps
 SC = True #apply SC or not
-noise_rels = 1 #0 # number of noise realisations considered
-rot_num = 1 # number of rotations considered (max 4)
+noise_rels = 2 #0 # number of noise realisations considered
+rot_num = 4 # number of rotations considered (max 4)
 A_IA = 0.0
 e_IA = 0.0
-runs_cosmo = 10 #7 # number of cosmogrid independent maps
+runs_cosmo = 50 #7 # number of cosmogrid independent maps
 noise_type = 'desy3' # or 'random_depth'
 
 
@@ -885,8 +896,8 @@ noise_type = 'desy3' # or 'random_depth'
 
 
 path_sims = '/global/cfs/cdirs/des/cosmogrid/raw/grid/cosmo_002846/'
-output_intermediate_maps = '/global/cfs/cdirs/des/mgatti/cosmogrid_002846_1024_3/' # this is the fiducial run
-output_temp = '/global/cfs/cdirs/des/mgatti/cosmogrid/baryons_002846_final/'
+output_intermediate_maps = '/global/cfs/cdirs/des/mgatti/cosmogrid_002846_1024_4/' # this is the fiducial run
+output_temp = '/global/cfs/cdirs/des/mgatti/cosmogrid/baryons_002846_final1/'
 
 path_sims = '/global/cfs/cdirs/des/cosmogrid/raw/fiducial/cosmo_fiducial/'
 output_intermediate_maps = '/global/cfs/cdirs/des/mgatti/cosmogridfiducial_4/' # this is the fiducial run
@@ -1024,5 +1035,5 @@ if __name__ == '__main__':
     #    #comm.Barrier()
 ##srun --nodes=4 --tasks-per-node=64  python run_cosmogrid_baryons.py
 ##srun --nodes=1 --tasks-per-node=4 --cpus-per-task=16 --cpu-bind=cores  python run_cosmogrid_baryons.py
-##srun --nodes=1 --tasks-per-node=10 python run_cosmogrid_baryons.py
+##srun --nodes=4 --tasks-per-node=12 python run_cosmogrid_baryons.py
 
