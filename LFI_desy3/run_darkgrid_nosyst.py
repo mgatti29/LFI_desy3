@@ -1,0 +1,880 @@
+import yaml
+import pickle
+import healpy as hp
+import numpy as np
+import os
+from astropy.table import Table
+import gc
+import pyfits as pf
+from Moments_analysis import g2k_sphere
+import timeit
+import os
+import copy
+from bornraytrace import lensing as brk
+import numpy as np
+from bornraytrace import intrinsic_alignments as iaa
+import bornraytrace
+from astropy.table import Table
+import healpy as hp
+import frogress
+import pyfits as pf
+from astropy.cosmology import z_at_value
+from astropy.cosmology import FlatLambdaCDM
+from astropy import units as u
+import cosmolopy.distance as cd
+from scipy.interpolate import interp1d
+import gc
+import pandas as pd
+import pickle
+import multiprocessing
+from functools import partial
+from astropy.cosmology import FlatLambdaCDM,wCDM
+import timeit
+def apply_random_rotation(e1_in, e2_in):
+    np.random.seed() # CRITICAL in multiple processes !
+    rot_angle = np.random.rand(len(e1_in))*2*np.pi #no need for 2?
+    cos = np.cos(rot_angle)
+    sin = np.sin(rot_angle)
+    e1_out = + e1_in * cos + e2_in * sin
+    e2_out = - e1_in * sin + e2_in * cos
+    return e1_out, e2_out
+
+def IndexToDeclRa(index, nside,nest= False):
+    theta,phi=hp.pixelfunc.pix2ang(nside ,index,nest=nest)
+    return -np.degrees(theta-np.pi/2.),np.degrees(phi)
+
+def convert_to_pix_coord(ra, dec, nside=1024):
+    """
+    Converts RA,DEC to hpix coordinates
+    """
+
+    theta = (90.0 - dec) * np.pi / 180.
+    phi = ra * np.pi / 180.
+    pix = hp.ang2pix(nside, theta, phi, nest=False)
+
+    return pix
+
+def generate_randoms_radec(minra, maxra, mindec, maxdec, Ngen, raoffset=0):
+    r = 1.0
+    # this z is not redshift!
+    zmin = r * np.sin(np.pi * mindec / 180.)
+    zmax = r * np.sin(np.pi * maxdec / 180.)
+    # parity transform from usual, but let's not worry about that
+    phimin = np.pi / 180. * (minra - 180 + raoffset)
+    phimax = np.pi / 180. * (maxra - 180 + raoffset)
+    # generate ra and dec
+    z_coord = np.random.uniform(zmin, zmax, Ngen)  # not redshift!
+    phi = np.random.uniform(phimin, phimax, Ngen)
+    dec_rad = np.arcsin(z_coord / r)
+    # convert to ra and dec
+    ra = phi * 180 / np.pi + 180 - raoffset
+    dec = dec_rad * 180 / np.pi
+    return ra, dec
+
+
+def addSourceEllipticity(self,es,es_colnames=("e1","e2"),rs_correction=True,inplace=False):
+
+		"""
+
+		:param es: array of intrinsic ellipticities,
+
+		"""
+
+		#Safety check
+		assert len(self)==len(es)
+
+		#Compute complex source ellipticity, shear
+		es_c = np.array(es[es_colnames[0]]+es[es_colnames[1]]*1j)
+		g = np.array(self["shear1"] + self["shear2"]*1j)
+
+		#Shear the intrinsic ellipticity
+		e = es_c + g
+		if rs_correction:
+			e /= (1 + g.conjugate()*es_c)
+
+		#Return
+		if inplace:
+			self["shear1"] = e.real
+			self["shear2"] = e.imag
+		else:
+			return (e.real,e.imag)
+
+def random_draw_ell_from_w(wi,w,e1,e2):
+    '''
+    wi: input weights
+    w,e1,e2: all the weights and galaxy ellipticities of the catalog.
+    e1_,e2_: output ellipticities drawn from w,e1,e2.
+    '''
+
+
+    ell_cont = dict()
+    for w_ in np.unique(w):
+        mask_ = w == w_
+        w__ = np.int(w_*10000)
+        ell_cont[w__] = [e1[mask_],e2[mask_]]
+
+    e1_ = np.zeros(len(wi))
+    e2_ = np.zeros(len(wi))
+
+
+    for w_ in np.unique(wi):
+        mask_ = (wi*10000).astype(np.int) == np.int(w_*10000)
+        e1_[mask_] = ell_cont[np.int(w_*10000)][0][np.random.randint(0,len(ell_cont[np.int(w_*10000)][0]),len(e1_[mask_]))]
+        e2_[mask_] = ell_cont[np.int(w_*10000)][1][np.random.randint(0,len(ell_cont[np.int(w_*10000)][0]),len(e1_[mask_]))]
+
+    return e1_,e2_
+
+def save_obj(name, obj):
+    with open(name + '.pkl', 'wb') as f:
+        pickle.dump(obj, f, protocol=2)
+        f.close()
+
+def load_obj(name):
+    with open(name + '.pkl', 'rb') as f:
+        mute =  pickle.load(f)
+        f.close()
+    return mute
+
+
+
+def gk_inv(K,KB,nside,lmax):
+
+    alms = hp.map2alm(K, lmax=lmax, pol=False)  # Spin transform!
+
+    ell, emm = hp.Alm.getlm(lmax=lmax)
+
+    kalmsE = alms/( 1. * ((ell * (ell + 1.)) / ((ell + 2.) * (ell - 1))) ** 0.5)
+
+    kalmsE[ell == 0] = 0.0
+
+
+    alms = hp.map2alm(KB, lmax=lmax, pol=False)  # Spin transform!
+
+    ell, emm = hp.Alm.getlm(lmax=lmax)
+
+    kalmsB = alms/( 1. * ((ell * (ell + 1.)) / ((ell + 2.) * (ell - 1))) ** 0.5)
+
+    kalmsB[ell == 0] = 0.0
+
+    _,e1t,e2t = hp.alm2map([kalmsE,kalmsE,kalmsB] , nside=nside, lmax=lmax, pol=True)
+    return e1t,e2t# ,r
+
+
+
+def g2k_sphere(gamma1, gamma2, mask, nside=1024, lmax=2048,nosh=True):
+    """
+    Convert shear to convergence on a sphere. In put are all healpix maps.
+    """
+
+    gamma1_mask = gamma1 * mask
+    gamma2_mask = gamma2 * mask
+
+    KQU_masked_maps = [gamma1_mask, gamma1_mask, gamma2_mask]
+    alms = hp.map2alm(KQU_masked_maps, lmax=lmax, pol=True)  # Spin transform!
+
+
+    ell, emm = hp.Alm.getlm(lmax=lmax)
+    if nosh:
+        almsE = alms[1] * 1. * ((ell * (ell + 1.)) / ((ell + 2.) * (ell - 1))) ** 0.5
+        almsB = alms[2] * 1. * ((ell * (ell + 1.)) / ((ell + 2.) * (ell - 1))) ** 0.5
+    else:
+        almsE = alms[1] * 1.
+        almsB = alms[2] * 1.
+    almsE[ell == 0] = 0.0
+    almsB[ell == 0] = 0.0
+    almsE[ell == 1] = 0.0
+    almsB[ell == 1] = 0.0
+
+
+
+
+    almssm = [alms[0], almsE, almsB]
+
+
+    kappa_map_alm = hp.alm2map(almssm[0], nside=nside, lmax=lmax, pol=False)
+    E_map = hp.alm2map(almssm[1], nside=nside, lmax=lmax, pol=False)
+    B_map = hp.alm2map(almssm[2], nside=nside, lmax=lmax, pol=False)
+
+    return E_map, B_map, almsE
+
+
+
+def rotate_map_approx(mask, rot_angles, flip=False,nside = 2048):
+    alpha, delta = hp.pix2ang(nside, np.arange(len(mask)))
+
+    rot = hp.rotator.Rotator(rot=rot_angles, deg=True)
+    rot_alpha, rot_delta = rot(alpha, delta)
+    if not flip:
+        rot_i = hp.ang2pix(nside, rot_alpha, rot_delta)
+    else:
+        rot_i = hp.ang2pix(nside, np.pi-rot_alpha, rot_delta)
+    rot_map = mask*0.
+    rot_map[rot_i] =  mask[np.arange(len(mask))]
+    return rot_map
+
+
+
+
+
+def make_maps(seed):
+    import timeit
+    st = timeit.default_timer()
+
+    # READ IN PARAMETERS ********************************************
+
+    p,params_dict = seed
+
+    # SET COSMOLOGY ************************************************
+    config = dict()
+    
+    
+    config['Om'] = params_dict['Omegam']
+    config['sigma8'] =  params_dict['s8']
+    config['ns'] =params_dict['ns']
+    config['Ob'] = Ob
+    config['h100'] = params_dict['h']
+
+    config['nside_out'] = 512
+    config['nside2'] = 512 
+    config['nside_intermediate'] = 1024
+    config['nside'] = 512
+    config['sources_bins'] = [1,2,3,4]
+    config['dz_sources'] = [params_dict['dz1'],params_dict['dz2'],params_dict['dz3'],params_dict['dz4']]
+    config['m_sources'] = [params_dict['m1'],params_dict['m2'],params_dict['m3'],params_dict['m4']]
+    config['m_sources'] = [-0.002,-0.017,-0.029,-0.038]#,[-0.006,-.01,-0.026,-0.032]
+    config['ms_sources'] = [0.0091,0.0078,0.0076,0.0076]
+
+    config['A_IA'] = params_dict['A']
+    config['eta_IA'] = params_dict['E']
+    config['f'] = params_dict['f']
+    config['z0_IA'] = 0.67
+    config['2PT_FILE'] = '/global/cfs/cdirs//des/www/y3_chains/data_vectors/2pt_NG_final_2ptunblind_02_26_21_wnz_maglim_covupdate_6000HR.fits'
+
+
+
+    cosmo1 = {'omega_M_0': config['Om'],
+     'omega_lambda_0':1-config['Om'],
+     'omega_k_0':0.0,
+     'omega_b_0' : config['Ob'],
+     'h':config['h100'],
+     'sigma_8' : config['sigma8'],
+     'n': config['ns']}
+
+    print ('h100',config['h100'])
+    cosmology = wCDM(H0= config['h100']*u.km / u.s / u.Mpc,
+                 Om0=config['Om'],#mega_fld,
+                 Ode0=1-config['Om'],#Omega_fld,
+                 w0=w0)
+
+
+
+    '''
+    Now the code will try to read in particle counts and make
+    kappa,e1,e2 maps. If they are already there, this phase will be skipped
+    '''
+
+    # path where kappa/g1/g2 maps are stored
+    base = output_intermediate_maps+'/meta_{0}/'.format(config['f'])
+
+    # original path for particle counts
+    '''
+    for the original, let's download the 2048 and downgrade them to 1024.
+    shell_ = hp.ud_grade(shell_,nside_out=config['nside_intermediate'])
+    '''
+    #
+    shell_files = glob.glob(params_dict['folder']+'/DES-Y3-shell_*')
+    z_bounds     = dict()
+ 
+    z_bounds['z-high'] =np.array([float(ff.split('z-high=')[1].split('_')[0]) for ff in shell_files])
+    z_bounds['z-low'] =np.array([float(ff.split('z-low=')[1].split('.fits')[0]) for ff in shell_files])
+    i_sprt = np.argsort(z_bounds['z-low'])
+    z_bounds['z-low']= (z_bounds['z-low'])[i_sprt]
+    z_bounds['z-high']= (z_bounds['z-high'])[i_sprt]
+    shell_files_sorted = np.array(shell_files)[i_sprt]
+    
+    
+
+
+
+    z_bin_edges = np.hstack([z_bounds['z-low'],z_bounds['z-high'][-1]])
+    
+  
+    # SAVE LENS MAPS  *****************************************************************
+    for s_ in frogress.bar(range(len(z_bounds['z-high']))):
+        path_ = base+'/lens_{0}_{1}.fits'.format(s_,config['nside_out'])
+        if not os.path.exists(path_):
+            m = pf.open(shell_files_sorted[s_])
+            shell_ =m[1].data['T'].flatten()
+            shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
+            shell_ = hp.ud_grade(shell_, nside_out = config['nside_out'])
+
+            fits_f = Table()
+            fits_f['T'] = shell_
+            if os.path.exists(path_):
+                os.remove(path_)
+            fits_f.write(path_)
+                
+    for s_ in frogress.bar(range(len(z_bounds['z-high']))):
+        path_ = base+'/lens_{0}_{1}.fits'.format(s_,config['nside_intermediate'])
+        if not os.path.exists(path_):
+            m = pf.open(shell_files_sorted[s_])
+            shell_ =m[1].data['T'].flatten()
+            shell_ =  (shell_-np.mean(shell_))/np.mean(shell_)
+            shell_ = hp.ud_grade(shell_, nside_out = config['nside_intermediate'])
+
+            fits_f = Table()
+            fits_f['T'] = shell_
+            if os.path.exists(path_):
+                os.remove(path_)
+            fits_f.write(path_)
+
+                
+           
+                
+    # SAVE CONVERGENCE PLANES ********************************************************
+    kappa_pref_evaluated = brk.kappa_prefactor(cosmology.H0, cosmology.Om0, length_unit = 'Mpc')
+    comoving_edges = [cosmology.comoving_distance(x_) for x_ in np.array((z_bounds['z-low']))]
+
+
+    z_centre = np.empty((len(comoving_edges)-1))
+    for i in range(len(comoving_edges)-1):
+        z_centre[i] = z_at_value(cosmology.comoving_distance,0.5*(comoving_edges[i]+comoving_edges[i+1]))
+
+    un_ = comoving_edges[:(i+1)][0].unit
+    comoving_edges = np.array([c.value for c in comoving_edges])
+    comoving_edges = comoving_edges*un_
+
+ 
+    overdensity_array = [np.zeros(hp.nside2npix(config['nside_intermediate']))]
+
+
+    path_ = base+'/gg_{0}_{1}.fits'.format(len(z_bounds['z-high'])-1,config['nside_out'])
+    if not os.path.exists(path_):
+
+        #print ('load lens')
+        for s_ in frogress.bar(range(len(z_bounds['z-high']))):
+            try:
+                path_ = base+'/lens_{0}_{1}.fits'.format(s_,config['nside_intermediate'])
+                m_ = pf.open(path_)
+                overdensity_array.append(m_[1].data['T'])
+            except:
+                if shell !=0:
+                    overdensity_array.append(np.zeros(hp.nside2npix(config['nside_intermediate'])))
+                #pass
+
+        #print ('done ++++')
+        overdensity_array = np.array(overdensity_array)
+        #print(overdensity_array.shape)
+
+        from bornraytrace import lensing
+        kappa_lensing = np.copy(overdensity_array)*0.
+
+
+
+        for i in frogress.bar(np.arange(1,kappa_lensing.shape[0])):
+            try:
+                kappa_lensing[i-1] = lensing.raytrace(cosmology.H0, cosmology.Om0,
+                                             overdensity_array=overdensity_array[1:(i+1)].T,
+                                             a_centre=1./(1.+z_centre[:i]),
+                                             comoving_edges=comoving_edges[:(i+1)])
+                
+                #kappa_lensing[i] = lensing.raytrace(cosmology.H0, cosmology.Om0,
+                #                             overdensity_array=overdensity_array[:i].T,
+                #                             a_centre=1./(1.+z_bin_edges[1:(i+1)]),
+                #                             comoving_edges=comoving_edges[:(i+1)])
+                #
+                
+            except:
+                print ('failed kappa ',i)
+               
+        for i in frogress.bar(np.arange(1,kappa_lensing.shape[0])):
+            
+            path_ = base+'/k_{0}_{1}.fits'.format(i,config['nside_intermediate'])
+            if not os.path.exists(path_):
+                fits_f = Table()
+            
+                fits_f['k'] = kappa_lensing[i]
+            
+                fits_f.write(path_)
+            
+                
+        # make g1 and g2 ---
+        for i in frogress.bar(range(kappa_lensing.shape[0])):
+            path_ = base+'/gg_{0}_{1}.fits'.format(i,config['nside_out'])
+            #try:
+            #     os.remove(path_)
+            #except:
+            #    pass
+#
+            if not os.path.exists(path_):
+
+                g1_, g2_ = gk_inv(kappa_lensing[i]-np.mean(kappa_lensing[i]),kappa_lensing[i]*0.,config['nside_intermediate'],config['nside_intermediate']*2)
+                g1_IA, g2_IA = gk_inv(overdensity_array[i]-np.mean(overdensity_array[i]),kappa_lensing[i]*0.,config['nside_intermediate'],config['nside_intermediate']*2)
+
+
+                fits_f = Table()
+                #alm = hp.sphtfunc.map2alm(g1_)
+                #g1_ = hp.sphtfunc.alm2map(alm,nside= config['nside_out'])
+                fits_f['g1'] = hp.ud_grade(g1_,nside_out =config['nside_out'])
+                fits_f['g2'] = hp.ud_grade(g2_,nside_out =config['nside_out'])
+                fits_f['g1_IA'] = hp.ud_grade(g1_IA,nside_out =config['nside_out'])
+                fits_f['g2_IA'] = hp.ud_grade(g2_IA,nside_out =config['nside_out'])
+
+                fits_f.write(path_)
+                path_ = base+'/lens_{0}_{1}.fits'.format(i,config['nside_intermediate'])
+                #os.system('rm {0}'.format(path_))
+
+
+
+
+
+                
+    
+    import timeit
+    st = timeit.default_timer()
+    if 1==1:
+            import timeit
+
+            print ('LOADING catalog')
+
+            sources_cat = dict()
+
+
+            ## ROTATIONS ---------------------------------------------------------
+            for rot in range(4):
+
+                sources_cat[rot] = dict()
+                mu = pf.open(config['2PT_FILE'])
+                random_rel = np.random.randint(0,6000,1)[0]
+                redshift_distributions_sources = {'z':None,'bins':dict()}
+                redshift_distributions_sources['z'] = mu[6].data['Z_MID']
+                for ix in config['sources_bins']:
+                    redshift_distributions_sources['bins'][ix] = mu[6].data['BIN{0}'.format(ix)]
+                mu = None
+
+
+                config['A_IA'] = np.random.randint(-300000,300000,1)[0]/100000
+                config['eta_IA'] = 0.#np.random.randint(-500000,500000,1)[0]/100000
+                config['A_IA'] = 0.#np.random.randint(-300000,300000,1)[0]/100000
+                #config['eta_IA'] = 0.
+                config['z0_IA'] = 0.67
+                if not SC:
+                    BIAS_SC = 0.
+                else:
+                    BIAS_SC = 1.
+
+                g1_tomo = dict()
+                g2_tomo = dict()
+                d_tomo = dict()
+                nz_kernel_sample_dict = dict()
+
+                print ('LOADING, {0}'.format(rot))
+                for tomo_bin in config['sources_bins']:
+                    g1_tomo[tomo_bin] = np.zeros(hp.nside2npix(config['nside']))
+                    g2_tomo[tomo_bin] = np.zeros(hp.nside2npix(config['nside']))
+                    d_tomo[tomo_bin] = np.zeros(hp.nside2npix(config['nside']))
+                    redshift_distributions_sources['bins'][tomo_bin][250:] = 0.
+                    nz_sample = brk.recentre_nz(np.array(z_bin_edges).astype('float'),  redshift_distributions_sources['z'],  redshift_distributions_sources['bins'][tomo_bin] )
+                    nz_kernel_sample_dict[tomo_bin] = nz_sample*(z_bin_edges[1:]-z_bin_edges[:-1])
+
+
+                # these quantities are for the IA computation
+                c1 = (5e-14 * (u.Mpc**3.)/(u.solMass * u.littleh**2) ) 
+                c1_cgs = (c1* ((u.littleh/(cosmology.H0.value/100))**2.)).cgs
+                rho_c1 = (c1_cgs*cosmology.critical_density(0)).value
+
+
+                # fill in g1,g1 maps
+                for i in (range(2,len(comoving_edges)-1)):
+
+                        path_ = base+'/lens_{0}_{1}.fits'.format(i,config['nside_out'])
+                        pathgg_ = base+'/gg_{0}_{1}.fits'.format(i,config['nside_out'])
+
+                        k_ = pf.open(pathgg_)
+                        d_ = pf.open(path_)
+                        IA_f = iaa.F_nla(z_centre[i], cosmology.Om0, rho_c1=rho_c1,A_ia = config['A_IA'], eta=config['eta_IA'], z0=config['z0_IA'],  lbar=0., l0=1e-9, beta=0.)
+                        #print ((k_[1].data['T']))
+                        for tomo_bin in config['sources_bins']:         
+                            m_ = 1.+config['m_sources'][tomo_bin-1]
+                            b = 1.#extra_params['db'][tomo_bin]
+                            if SC:
+                                g1_tomo[tomo_bin]  +=  ((1.+(b*d_[1].data['T']))*(k_[1].data['g1']+k_[1].data['g1_IA']*IA_f))*nz_kernel_sample_dict[tomo_bin][i]
+                                g2_tomo[tomo_bin]  +=  ((1.+(b*d_[1].data['T']))*(k_[1].data['g2']+k_[1].data['g2_IA']*IA_f))*nz_kernel_sample_dict[tomo_bin][i]
+                                d_tomo[tomo_bin] +=  (1.+b*d_[1].data['T'])*nz_kernel_sample_dict[tomo_bin][i]
+                            else:
+                                g1_tomo[tomo_bin]  +=  (k_[1].data['g1']+k_[1].data['g1_IA']*IA_f)*nz_kernel_sample_dict[tomo_bin][i]
+                                g2_tomo[tomo_bin]  +=  (k_[1].data['g2']+k_[1].data['g2_IA']*IA_f)*nz_kernel_sample_dict[tomo_bin][i]
+                                d_tomo[tomo_bin] +=  (1.+d_[1].data['T'])*nz_kernel_sample_dict[tomo_bin][i]
+
+
+                    #g1_tomo[tomo_bin] = hp.ud_grade( copy.copy(g1_tomo[tomo_bin]),nside_out=config['nside2'])
+                    #g2_tomo[tomo_bin] = hp.ud_grade( copy.copy(g2_tomo[tomo_bin]),nside_out=config['nside2'])
+                    #d_tomo[tomo_bin] =  hp.ud_grade( copy.copy(d_tomo[tomo_bin]),nside_out=config['nside2'])
+
+
+
+
+
+                print ('done loading')      
+
+
+
+                nuis = dict()
+                nuis['m'] = np.zeros(4) 
+                for tomo_bin in config['sources_bins']:
+                    m_ = 1+config['m_sources'][tomo_bin-1]
+                    s_ = config['ms_sources'][tomo_bin-1]
+                    m_1 = m_ #np.random.normal(m_,s_,1)[0]
+                    nuis['m'][tomo_bin-1] = m_1
+
+
+
+
+
+
+
+                # let's make DES mock catalogs
+
+                config['nside2'] = 512 
+
+                for tomo_bin in config['sources_bins']:
+
+                    sources_cat[rot][tomo_bin] = dict()
+
+                    # load into memory the des y3 mock catalogue
+                    mcal_catalog = load_obj('/global/cfs/cdirs/des/mass_maps/Maps_final/data_catalogs_weighted_{0}'.format(tomo_bin-1))
+
+                    pix_ = convert_to_pix_coord(mcal_catalog['ra'], mcal_catalog['dec'], nside=config['nside2']*2)
+
+                    e1 = mcal_catalog['e1']
+                    e2 = mcal_catalog['e2']
+                    w  = mcal_catalog['w']
+
+                    # we can cut 4 des y3 footprint out of the full sky. this is controlled by the 'rot' parameter
+                    nn = params_dict['noise']
+                    if nn ==0:
+                        delta_ = 0. # shifting it!
+                    if nn ==1:
+                        delta_ = 0. # shifting it!
+                    if nn ==2:
+                        delta_ = 45. # shifting it!
+                    if nn ==3:
+                        delta_ = 45. # shifting it!
+                    if nn ==4:
+                        delta_ = 90. # shifting it!
+                    if nn ==5:
+                        delta_ = 90. # shifting it!
+                    if nn ==6:
+                        delta_ = 135. # shifting it!
+                    if nn ==7:
+                        delta_ = 135. # shifting it!
+                    if nn ==8:
+                        delta_ = 0. # shifting it!                    
+
+
+                    if rot ==0:
+                        rot_angles = [0+delta_, 0, 0]
+                        flip=False
+                        rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                        alpha, delta = hp.pix2ang(config['nside2']*2,pix_)
+                        rot_alpha, rot_delta = rotu(alpha, delta)
+                        if not flip:
+                            pix = hp.ang2pix(config['nside2']*2, rot_alpha, rot_delta)
+                        else:
+                            pix = hp.ang2pix(config['nside2']*2, np.pi-rot_alpha, rot_delta)
+
+                    if rot ==1:
+                        rot_angles = [180+delta_, 0, 0]
+                        flip=False
+                        rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                        alpha, delta = hp.pix2ang(config['nside2']*2,pix_)
+                        rot_alpha, rot_delta = rotu(alpha, delta)
+                        if not flip:
+                            pix = hp.ang2pix(config['nside2']*2, rot_alpha, rot_delta)
+                        else:
+                            pix = hp.ang2pix(config['nside2']*2, np.pi-rot_alpha, rot_delta)
+
+                    if rot ==2:
+                        rot_angles = [90+delta_, 0, 0]
+                        flip=True
+                        rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                        alpha, delta = hp.pix2ang(config['nside2']*2,pix_)
+                        rot_alpha, rot_delta = rotu(alpha, delta)
+                        if not flip:
+                            pix = hp.ang2pix(config['nside2']*2, rot_alpha, rot_delta)
+                        else:
+                            pix = hp.ang2pix(config['nside2']*2, np.pi-rot_alpha, rot_delta)
+
+                    if rot ==3:
+                        rot_angles = [270+delta_, 0, 0]
+                        flip=True
+                        rotu = hp.rotator.Rotator(rot=rot_angles, deg=True)
+                        alpha, delta = hp.pix2ang(config['nside2']*2,pix_)
+                        rot_alpha, rot_delta = rotu(alpha, delta)
+                        if not flip:
+                            pix = hp.ang2pix(config['nside2']*2, rot_alpha, rot_delta)
+                        else:
+                            pix = hp.ang2pix(config['nside2']*2, np.pi-rot_alpha, rot_delta)
+
+                    dec__,ra__ = IndexToDeclRa(pix,config['nside2']*2)
+                    pix = convert_to_pix_coord(ra__,dec__, nside=config['nside2'])
+                    del mcal_catalog
+                    gc.collect() 
+
+                    # the factor f controls the source clustering effect on shape noise
+                    f = 1./np.sqrt(d_tomo[tomo_bin]/np.sum(nz_kernel_sample_dict[tomo_bin]))
+
+                    f = f[pix]
+
+                    if not SC:
+                        f = 1.
+
+                    # ++++++++++++++++++++++
+
+                    n_map = np.zeros(hp.nside2npix(config['nside2']))
+                    n_map_sc = np.zeros(hp.nside2npix(config['nside2']))
+
+                    unique_pix, idx, idx_rep = np.unique(pix, return_index=True, return_inverse=True)
+
+
+                    n_map_sc[unique_pix] += np.bincount(idx_rep, weights=w/f**2)
+                    n_map[unique_pix] += np.bincount(idx_rep, weights=w)
+
+                    g1_ = g1_tomo[tomo_bin][pix]
+                    g2_ = g2_tomo[tomo_bin][pix]
+
+
+                    es1,es2 = apply_random_rotation(e1/f, e2/f)
+                    es1_ref,es2_ref = apply_random_rotation(e1, e2)
+                    es1a,es2a = apply_random_rotation(e1/f, e2/f)
+
+
+                    x1_sc,x2_sc = addSourceEllipticity({'shear1':g1_,'shear2':g2_},{'e1':es1,'e2':es2},es_colnames=("e1","e2"))
+
+
+                    e1r_map = np.zeros(hp.nside2npix(config['nside2']))
+                    e2r_map = np.zeros(hp.nside2npix(config['nside2']))
+
+                    e1r_map0 = np.zeros(hp.nside2npix(config['nside2']))
+                    e2r_map0 = np.zeros(hp.nside2npix(config['nside2']))
+
+                    e1r_map0_ref = np.zeros(hp.nside2npix(config['nside2']))
+                    e2r_map0_ref = np.zeros(hp.nside2npix(config['nside2']))
+
+                    g1_map = np.zeros(hp.nside2npix(config['nside2']))
+                    g2_map = np.zeros(hp.nside2npix(config['nside2']))
+
+                    unique_pix, idx, idx_rep = np.unique(pix, return_index=True, return_inverse=True)
+
+
+                    e1r_map[unique_pix] += np.bincount(idx_rep, weights=es1*w)
+                    e2r_map[unique_pix] += np.bincount(idx_rep, weights=es2*w)
+
+                    e1r_map0[unique_pix] += np.bincount(idx_rep, weights=es1a*w)
+                    e2r_map0[unique_pix] += np.bincount(idx_rep, weights=es2a*w)
+
+                    e1r_map0_ref[unique_pix] += np.bincount(idx_rep, weights=es1_ref*w)
+                    e2r_map0_ref[unique_pix] += np.bincount(idx_rep, weights=es2_ref*w)
+
+
+                    mask_sims = n_map_sc != 0.
+                    e1r_map[mask_sims]  = e1r_map[mask_sims]/(n_map_sc[mask_sims])
+                    e2r_map[mask_sims] =  e2r_map[mask_sims]/(n_map_sc[mask_sims])
+                    e1r_map0[mask_sims]  = e1r_map0[mask_sims]/(n_map_sc[mask_sims])
+                    e2r_map0[mask_sims] =  e2r_map0[mask_sims]/(n_map_sc[mask_sims])
+                    e1r_map0_ref[mask_sims]  = e1r_map0_ref[mask_sims]/(n_map[mask_sims])
+                    e2r_map0_ref[mask_sims] =  e2r_map0_ref[mask_sims]/(n_map[mask_sims])
+
+
+
+                    var_ =  e1r_map0_ref**2+e2r_map0_ref**2
+                    
+                    if  SC:
+                        e1r_map   *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+                        e2r_map   *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+                        e1r_map0 *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+                        e2r_map0 *= 1/(np.sqrt(0.995*corr[tomo_bin-1])) * np.sqrt((1-coeff_kurtosis[tomo_bin-1]*var_))
+
+
+                 
+                    g1_map[unique_pix] += np.bincount(idx_rep, weights= g1_*w)
+                    g2_map[unique_pix] += np.bincount(idx_rep, weights= g2_*w)
+
+
+
+
+
+
+
+
+                    g1_map[mask_sims]  = g1_map[mask_sims]/(n_map_sc[mask_sims])
+                    g2_map[mask_sims] =  g2_map[mask_sims]/(n_map_sc[mask_sims])
+
+                    e1_ = ((g1_map*nuis['m'][tomo_bin-1]+e1r_map0))[mask_sims]
+                    e2_ = ((g2_map*nuis['m'][tomo_bin-1]+e2r_map0))[mask_sims]
+                    e1n_ = ( e1r_map)[mask_sims]
+                    e2n_ = ( e2r_map)[mask_sims]
+                    idx_ = np.arange(len(mask_sims))[mask_sims]
+
+                    sources_cat[rot][tomo_bin] = {'g1':g1_tomo[tomo_bin],'g2':g2_tomo[tomo_bin],'e1':e1_,'e2':e2_,'e1n':e1n_,'e2n':e2n_,'pix':idx_}
+
+                nuis['hyperrank_rel'] = random_rel
+                nuis['A_IA'] = config['A_IA'] 
+                nuis['E_IA'] = config['eta_IA'] 
+                sources_cat[rot]['nuisance_params'] = nuis
+                sources_cat[rot]['config'] = copy.deepcopy(config)
+
+
+    save_obj(output_temp+p,sources_cat)
+    
+   #srun --nodes=4 --tasks-per-node=2  python run_cosmogrid_baryons.py
+
+#salloc --nodes 4 --qos interactive --time 04:00:00 --constraint cpu --account=des
+
+corr = [1.0608,1.0295,1.0188,1.0115]
+coeff_kurtosis = [0.1,0.05,0.036,0.036]
+
+
+# some config
+nside = 512 #nside cosmogrid particle count maps
+nside_out = 512 #nside final noisy maps
+SC = False #apply SC or not
+noise_rels = 1 #0 # number of noise realisations considered
+rot_num = 4 # number of rotations considered (max 4)
+A_IA = 0.0
+e_IA = 0.0
+noise_type = 'desy3' # or 'random_depth'
+
+
+path_sims = '/global/cfs/cdirs/des/darkgrid/grid_run_1/'
+output_intermediate_maps = '/global/cfs/cdirs/des/mgatti/intermediate_darkgrid/' 
+output_temp = '/global/cfs/cdirs/des/mgatti/darkgrid_SC_nosyst/'
+
+
+
+        
+        
+if __name__ == '__main__':
+
+
+
+    import glob
+    runstodo=[]
+    count = 0
+    miss = 0
+
+    folders_ = glob.glob(path_sims+'/cosmo_*')
+    runs_cosmo = len(folders_)
+    
+    def get_params(name):
+        #print (name)
+        om = float(name.split('/')[-1].split('=')[1].split('_')[0])
+        s8 = float(name.split('/')[-1].split('=')[3])  
+        return om,s8
+
+    for f in range(0,runs_cosmo):
+
+        if not os.path.exists(output_intermediate_maps+'/meta_{0}/'.format(f)):
+            try:
+                os.mkdir(output_intermediate_maps+'/meta_{0}/'.format(f))
+            except:
+                pass
+
+        Omegam,s8 = get_params(folders_[f])
+        
+        ns = 0.9649
+        Ob = 0.0493
+        h = 100.*0.6736
+        w0 = -1.
+
+        
+        for nn in range(1):
+          
+
+                params_dict = dict()
+                params_dict['Omegam'] = np.float(Omegam)
+                params_dict['s8'] = np.float(s8)
+
+                params_dict['A'] = A_IA
+                params_dict['E'] = e_IA
+                params_dict['noise'] = nn
+
+
+                params_dict['folder'] = folders_[f]
+                params_dict['ns'] = np.float(ns)
+                params_dict['h'] = np.float(h)
+                params_dict['ob'] = np.float(Ob)
+
+                params_dict['SC'] = SC
+                params_dict['f'] = f
+
+
+                params_dict['m1'] =  -0.002
+                params_dict['m2'] =  -0.017
+                params_dict['m3'] =  -0.029
+                params_dict['m4'] =  -0.038
+
+
+                params_dict['dz1'] = 0.
+                params_dict['dz2'] = 0.
+                params_dict['dz3'] = 0.
+                params_dict['dz4'] = 0.
+
+
+                p = '{0}_noiserel_{1}'.format(f,nn)
+                
+
+                if not os.path.exists(output_temp+p+'.pkl'):
+                    runstodo.append([p,params_dict])
+                    miss+=1
+                else:
+                    count +=1
+
+
+    #make_maps(runstodo[0])
+    #'''
+    run_count=0
+    
+    from mpi4py import MPI
+    while run_count<len(runstodo):
+        comm = MPI.COMM_WORLD
+##
+        if (run_count+comm.rank)<len(runstodo):
+            #try:
+                make_maps(runstodo[run_count+comm.rank])
+           # except:
+           #     pass
+        #if (run_count)<len(runstodo):
+        #    make_maps(runstodo[run_count])
+        run_count+=comm.size
+        comm.bcast(run_count,root = 0)
+        comm.Barrier()
+    '''     
+
+    #while run_count<len(runstodo):
+    #    
+##
+    #    if (run_count)<len(runstodo):
+    #        #try:
+    #            make_maps(runstodo[run_count])
+    #       # except:
+    #       #     pass
+    #    #if (run_count)<len(runstodo):
+    #    #    make_maps(runstodo[run_count])
+    #    run_count+=1
+    #    #comm.bcast(run_count,root = 0)
+    #    #comm.Barrier()
+    '''
+##srun --nodes=1 --tasks-per-node=32  python run_cosmogrid_baryons.py
+##srun --nodes=1 --tasks-per-node=4 --cpus-per-task=16 --cpu-bind=cores  python run_cosmogrid_baryons.py
+##srun --nodes=4 --tasks-per-node=32 python run_darkgrid_nosyst.py
+'''
+noiserel1 = 90
+noiserel2 = 45
+noiserel3 = 135
+noiserel4 = 0
+noiserel5 = 90
+noiserel6 = 45
+noiserel7 = 135
+noiserel8 = 0
+'''
